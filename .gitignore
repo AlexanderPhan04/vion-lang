@@ -21,6 +21,7 @@ compile_commands.json
 *.pdb
 *.ilk
 *.exe
+*.zip
 *.tar.gz
 *.7z
 *.vsix
