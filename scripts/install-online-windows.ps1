@@ -241,7 +241,36 @@ try {
     New-Item -ItemType Directory -Force -Path $DocsDir | Out-Null
     New-Item -ItemType Directory -Force -Path $ExamplesDir | Out-Null
 
-    Copy-Item -LiteralPath $VionExe.FullName -Destination (Join-Path $BinDir "vion.exe") -Force
+    $DestExe  = Join-Path $BinDir "vion.exe"
+    $TempExe  = Join-Path $BinDir "vion_new.exe"
+    $OldExe   = Join-Path $BinDir "vion_old.exe"
+
+    # Copy new binary to a staging name first (avoids "file in use" error)
+    Copy-Item -LiteralPath $VionExe.FullName -Destination $TempExe -Force
+
+    # Check if destination exe is currently locked (running process)
+    $IsLocked = $false
+    if (Test-Path $DestExe) {
+        try {
+            $fs = [System.IO.File]::Open($DestExe, 'Open', 'ReadWrite', 'None')
+            $fs.Close()
+        } catch {
+            $IsLocked = $true
+        }
+    }
+
+    if ($IsLocked) {
+        # Schedule replacement via a background cmd batch:
+        # wait 1s → rename old → rename new → delete old
+        $BatchContent = "@echo off`r`ntimeout /t 1 /nobreak > nul`r`nmove /y `"$TempExe`" `"$DestExe`"`r`ndel `"$OldExe`" 2>nul`r`n"
+        $BatchPath = Join-Path $env:TEMP "vion_update.bat"
+        [System.IO.File]::WriteAllText($BatchPath, $BatchContent, [System.Text.Encoding]::ASCII)
+        Start-Process -FilePath "cmd.exe" -ArgumentList "/c `"$BatchPath`"" -WindowStyle Hidden
+        Write-Host "Update staged — vion.exe will be replaced in 1 second after the current process exits."
+    } else {
+        Move-Item -LiteralPath $TempExe -Destination $DestExe -Force
+    }
+
 
     foreach ($DocName in @("LICENSE", "README.md", "INSTALL.md", "LANGUAGE_SPEC.md", "ROADMAP.md", "uninstall-windows.ps1")) {
         Copy-FirstMatchingFile -Root $ExtractDir -FileName $DocName -Destination $DocsDir
