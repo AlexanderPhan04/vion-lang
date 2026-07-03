@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -36,6 +37,11 @@ private:
     Value evaluateLogical(const LogicalExpr& expression);
     Value evaluateBinary(const BinaryExpr& expression);
     Value evaluateCall(const CallExpr& expression);
+    Value evaluateIndex(const IndexExpr& expression);
 
     bool valuesEqual(const Value& left, const Value& right) const;
+
+    std::string locationOf(int line) const;
+
+    void registerBuiltins();
 };

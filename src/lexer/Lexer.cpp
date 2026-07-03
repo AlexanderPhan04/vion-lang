@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 Lexer::Lexer(std::string source) : source(std::move(source)) {
+    // Strip UTF-8 BOM if present
     if (
         this->source.size() >= 3 &&
         static_cast<unsigned char>(this->source[0]) == 0xEF &&
@@ -71,8 +72,17 @@ void Lexer::scanToken() {
         case '}':
             addToken(TokenType::RIGHT_BRACE);
             break;
+        case '[':
+            addToken(TokenType::LEFT_BRACKET);
+            break;
+        case ']':
+            addToken(TokenType::RIGHT_BRACKET);
+            break;
         case ',':
             addToken(TokenType::COMMA);
+            break;
+        case '.':
+            addToken(TokenType::DOT);
             break;
         case '+':
             addToken(TokenType::PLUS);
@@ -82,6 +92,9 @@ void Lexer::scanToken() {
             break;
         case '*':
             addToken(TokenType::STAR);
+            break;
+        case '%':
+            addToken(TokenType::PERCENT);
             break;
         case '/':
             if (match('/')) {
@@ -143,18 +156,22 @@ void Lexer::identifier() {
     std::string text = source.substr(start, current - start);
 
     static const std::unordered_map<std::string, TokenType> keywords = {
-        {"let", TokenType::LET},
-        {"print", TokenType::PRINT},
-        {"if", TokenType::IF},
-        {"else", TokenType::ELSE},
-        {"while", TokenType::WHILE},
-        {"fn", TokenType::FN},
-        {"return", TokenType::RETURN},
-        {"and", TokenType::AND},
-        {"or", TokenType::OR},
-        {"true", TokenType::TRUE},
-        {"false", TokenType::FALSE},
-        {"nil", TokenType::NIL}
+        {"let",      TokenType::LET},
+        {"print",    TokenType::PRINT},
+        {"if",       TokenType::IF},
+        {"else",     TokenType::ELSE},
+        {"while",    TokenType::WHILE},
+        {"for",      TokenType::FOR},
+        {"in",       TokenType::IN},
+        {"fn",       TokenType::FN},
+        {"return",   TokenType::RETURN},
+        {"break",    TokenType::BREAK},
+        {"continue", TokenType::CONTINUE},
+        {"and",      TokenType::AND},
+        {"or",       TokenType::OR},
+        {"true",     TokenType::TRUE},
+        {"false",    TokenType::FALSE},
+        {"nil",      TokenType::NIL}
     };
 
     auto found = keywords.find(text);
@@ -177,13 +194,42 @@ void Lexer::number() {
 }
 
 void Lexer::string() {
+    std::string value;
+
     while (peek() != '"' && !isAtEnd()) {
-        if (peek() == '\n') {
+        char ch = peek();
+
+        if (ch == '\n') {
             line++;
             column = 1;
+            value += '\n';
             current++;
+        } else if (ch == '\\') {
+            // Handle escape sequences
+            current++;
+            column++;
+            if (isAtEnd()) break;
+
+            char escaped = source[current++];
+            column++;
+
+            switch (escaped) {
+                case 'n':  value += '\n'; break;
+                case 't':  value += '\t'; break;
+                case 'r':  value += '\r'; break;
+                case '\\': value += '\\'; break;
+                case '"':  value += '"';  break;
+                case '0':  value += '\0'; break;
+                default:
+                    // Unknown escape — keep as-is
+                    value += '\\';
+                    value += escaped;
+                    break;
+            }
         } else {
-            advance();
+            value += ch;
+            current++;
+            column++;
         }
     }
 
@@ -195,9 +241,7 @@ void Lexer::string() {
         );
     }
 
-    advance();
-
-    std::string value = source.substr(start + 1, current - start - 2);
+    advance(); // closing "
     addToken(TokenType::STRING, value);
 }
 

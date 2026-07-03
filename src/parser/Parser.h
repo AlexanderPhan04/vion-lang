@@ -23,7 +23,10 @@ private:
     std::unique_ptr<Stmt> printStatement();
     std::unique_ptr<Stmt> ifStatement();
     std::unique_ptr<Stmt> whileStatement();
+    std::unique_ptr<Stmt> forStatement();
     std::unique_ptr<Stmt> returnStatement();
+    std::unique_ptr<Stmt> breakStatement();
+    std::unique_ptr<Stmt> continueStatement();
     std::unique_ptr<Stmt> expressionStatement();
     std::unique_ptr<BlockStmt> blockStatement();
 

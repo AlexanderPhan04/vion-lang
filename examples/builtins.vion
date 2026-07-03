@@ -1,0 +1,49 @@
+// builtins.vion — demonstrates all built-in functions in Vion v0.3
+
+// str() — convert to string
+let n = 42
+let s = str(n)
+print type(s)       // string
+print s + " is the answer"  // "42 is the answer"
+
+// num() — convert string to number
+let parsed = num("3.14")
+print parsed * 2    // 6.28
+
+// type() — get type name
+print type(nil)     // nil
+print type(true)    // boolean
+print type([])      // array
+
+// Math builtins
+print floor(3.7)    // 3
+print ceil(3.2)     // 4
+print sqrt(16)      // 4
+print abs(-5)       // 5
+print max(10, 20)   // 20
+print min(10, 20)   // 10
+
+// Modulo operator (%)
+print 10 % 3        // 1
+print 15 % 4        // 3
+
+// String escape sequences
+print "Hello\tWorld"   // Hello    World
+print "line1\nline2"   // two lines
+print "say \"hi\""     // say "hi"
+print "path\\file"     // path\file
+
+// String indexing
+let word = "Vion"
+print word[0]    // V
+print word[-1]   // n
+
+// for loop on a string (iterate chars)
+print "--- chars ---"
+for ch in "abc" {
+  print ch
+}
+
+// clock() — current time (for benchmarking)
+let t = clock()
+print type(t)    // number

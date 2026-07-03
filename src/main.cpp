@@ -120,7 +120,7 @@ static void startRepl() {
     Interpreter interpreter;
     std::string line;
 
-    std::cout << "Vion REPL v0.2.0\n";
+    std::cout << "Vion REPL v0.3.0\n";
     std::cout << "Type 'exit' or press Ctrl+Z then Enter to quit.\n";
 
     while (true) {
@@ -163,7 +163,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (isOneOf(command, {"version", "--version", "-v"})) {
-            std::cout << "Vion v0.2.0\n";
+            std::cout << "Vion v0.3.0\n";
             return 0;
         }
 

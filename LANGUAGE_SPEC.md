@@ -1,8 +1,10 @@
-# Vion Language Specification v0.2
+# Vion Language Specification v0.3
 
 ## Goal
 
-Vion is a small toy programming language for learning how lexer, parser, AST, interpreter, and CLI work.
+Vion is a dynamically-typed, expression-oriented programming language built in C++17. It supports first-class functions, closures, arrays, and a standard library of built-in functions.
+
+---
 
 ## Supported syntax
 
@@ -12,6 +14,7 @@ Vion is a small toy programming language for learning how lexer, parser, AST, in
 let x = 10
 let name = "Vion"
 let active = true
+let nothing = nil
 x = x + 1
 ```
 
@@ -32,10 +35,10 @@ let name = "global"
 
 {
   let name = "block"
-  print name
+  print name    // block
 }
 
-print name
+print name      // global
 ```
 
 ### If / else
@@ -59,6 +62,37 @@ while index < 3 {
 }
 ```
 
+### For-in loop (v0.3)
+
+Iterate over an array or a string:
+
+```vion
+let fruits = ["apple", "banana", "cherry"]
+
+for fruit in fruits {
+  print fruit
+}
+
+for ch in "hello" {
+  print ch
+}
+```
+
+### Break and Continue (v0.3)
+
+```vion
+let i = 0
+while i < 10 {
+  if i == 5 { break }
+  if i % 2 == 0 {
+    i = i + 1
+    continue
+  }
+  print i
+  i = i + 1
+}
+```
+
 ### Functions
 
 ```vion
@@ -66,7 +100,7 @@ fn add(a, b) {
   return a + b
 }
 
-print add(10, 20)
+print add(10, 20)  // 30
 ```
 
 Functions are values and close over their parent scope:
@@ -76,12 +110,28 @@ fn makeAdder(x) {
   fn addInner(y) {
     return x + y
   }
-
   return addInner
 }
 
 let addTwo = makeAdder(2)
-print addTwo(5)
+print addTwo(5)  // 7
+```
+
+### Arrays (v0.3)
+
+```vion
+let nums = [1, 2, 3]
+
+// Access
+print nums[0]   // 1
+print nums[-1]  // 3  (negative index from end)
+
+// Mutation
+nums[0] = 99
+
+// Concatenation
+let more = nums + [4, 5]
+print len(more)  // 5
 ```
 
 ### Comments
@@ -90,47 +140,86 @@ print addTwo(5)
 // This is a comment
 ```
 
+---
+
+## String Escape Sequences (v0.3)
+
+| Escape | Meaning |
+|--------|---------|
+| `\n` | Newline |
+| `\t` | Tab |
+| `\r` | Carriage return |
+| `\\` | Backslash |
+| `\"` | Double quote |
+| `\0` | Null character |
+
+---
+
 ## Supported value types
 
-- number
-- string
-- boolean
-- function
-- nil
+| Type | Example |
+|------|---------|
+| `number` | `42`, `3.14` |
+| `string` | `"hello"` |
+| `boolean` | `true`, `false` |
+| `function` | `fn add(a, b) { ... }` |
+| `array` | `[1, 2, 3]` |
+| `nil` | `nil` |
 
-## Supported operators
+---
 
-- arithmetic: `+ - * /`
-- comparison: `> >= < <=`
-- equality: `== !=`
-- logical: `and or !`
-- grouping: `( )`
-- call: `name(arguments)`
+## Operators
 
-## Not supported yet
+- **Arithmetic:** `+ - * / %`
+- **Comparison:** `> >= < <=`
+- **Equality:** `== !=`
+- **Logical:** `and or !`
+- **Grouping:** `( )`
+- **Call:** `name(arguments)`
+- **Index:** `arr[i]`, `arr[i] = val`
 
-- arrays
-- objects
-- imports/modules
-- type checker
-- bytecode
-- native compilation
+---
+
+## Built-in Functions (v0.3)
+
+| Function | Description |
+|----------|-------------|
+| `len(val)` | Length of array or string |
+| `push(arr, val)` | Append element to array, return array |
+| `pop(arr)` | Remove and return last element |
+| `str(val)` | Convert any value to string |
+| `num(val)` | Convert string to number |
+| `type(val)` | Return type name as string |
+| `input(prompt)` | Read a line from stdin |
+| `clock()` | Seconds since epoch (float) |
+| `floor(n)` | Round down |
+| `ceil(n)` | Round up |
+| `sqrt(n)` | Square root |
+| `abs(n)` | Absolute value |
+| `max(a, b)` | Larger of two numbers |
+| `min(a, b)` | Smaller of two numbers |
+| `array(size, fill)` | Create array of given size filled with value |
+
+---
 
 ## CLI
 
-Vion programs can be run directly:
-
 ```powershell
-vion main.vion
+vion main.vion              # Run a file
+vion run main.vion          # Run a file
+vion -r main.vion           # Run a file
+vion tokens main.vion       # Print tokens
+vion ast main.vion          # Print AST
+vion check main.vion        # Parse-check a file
+vion eval "print 1 + 2"     # Run inline source
+vion repl                   # Start interactive REPL
+vion version                # Show version
+vion help                   # Show help
 ```
 
-Useful command aliases:
+## Not supported yet
 
-- `vion -v` / `vion --version`
-- `vion -h` / `vion --help`
-- `vion -r main.vion` / `vion run main.vion`
-- `vion -t main.vion` / `vion tokens main.vion`
-- `vion -a main.vion` / `vion ast main.vion`
-- `vion -c main.vion` / `vion check main.vion`
-- `vion -e "print 1 + 2"` / `vion eval "print 1 + 2"`
-- `vion -i` / `vion repl`
+- Objects / maps
+- Imports / modules
+- Type checker
+- Bytecode compiler / VM

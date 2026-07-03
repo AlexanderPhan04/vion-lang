@@ -11,27 +11,40 @@
 - User-defined functions with parameters, closures, recursion, and `return`.
 - Integration test runner for CLI behavior.
 
+## Completed in v0.3
+
+- **Arrays:** literal `[1, 2, 3]`, indexing `arr[i]`, mutation `arr[i] = val`, negative indexing.
+- **Array concatenation:** `arr1 + arr2`.
+- **String indexing:** `str[i]` and negative indexing.
+- **For-in loop:** `for item in arr { ... }` iterates arrays and strings.
+- **Break and Continue:** `break` / `continue` in while and for loops.
+- **Modulo operator:** `%`.
+- **String escape sequences:** `\n`, `\t`, `\r`, `\\`, `\"`.
+- **Built-in functions:** `len`, `push`, `pop`, `str`, `num`, `type`, `input`, `clock`, `floor`, `ceil`, `sqrt`, `abs`, `max`, `min`, `array`.
+- **Source location in errors:** runtime errors now report line numbers.
+- **Fixed number formatting:** integers print without `.0` (e.g., `10` not `10.0`).
+
 ## Next Milestones
-
-### v0.3 Collections
-
-- Arrays and indexing.
-- Built-in functions such as `len`.
-- Better runtime errors with source locations.
 
 ### v0.4 Developer Experience
 
-- Interactive REPL.
+- Interactive multi-line REPL.
 - Formatter for `.vion` files.
-- More detailed parser recovery instead of stopping at the first parse error.
+- Better parser error recovery (continue past first error).
 
-### v0.5 Modules
+### v0.5 Objects / Maps
 
-- `import` support.
+- Object / dictionary type: `{ key: value }` literals.
+- Property access: `obj.key`, `obj["key"]`.
+- Object spread and copy.
+
+### v0.6 Modules
+
+- `import "path/file"` support.
 - Standard library layout.
 - File-level module cache.
 
-### v0.6 Execution Engine
+### v0.7 Execution Engine
 
 - Bytecode compiler.
 - Virtual machine.

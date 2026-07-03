@@ -56,7 +56,7 @@ $Cases = @(
         Name = "short version"
         Args = @("-v")
         ExitCode = 0
-        Output = "Vion v0.2.0"
+        Output = "Vion v0.3.0"
     },
     @{
         Name = "hello"
@@ -104,7 +104,43 @@ $Cases = @(
         Name = "runtime error"
         Args = @("run", (Join-Path $ProjectRoot "tests\cases\runtime-error.vion"))
         ExitCode = 1
-        Output = "Error: Runtime Error: division by zero."
+        Output = "Error: Runtime Error [line 1]: division by zero."
+    },
+    @{
+        Name = "arrays"
+        Args = @("run", (Join-Path $ProjectRoot "examples\arrays.vion"))
+        ExitCode = 0
+        Output = "10`n50`n50`n99`n5`n6`n60`n5`n--- for loop ---`n99`n20`n30`n40`n50`n6`n4`n15`narray`nstring`nnumber`n5`n0"
+    },
+    @{
+        Name = "for-in loop"
+        Args = @("run", (Join-Path $ProjectRoot "examples\arrays.vion"))
+        ExitCode = 0
+        Output = "10`n50`n50`n99`n5`n6`n60`n5`n--- for loop ---`n99`n20`n30`n40`n50`n6`n4`n15`narray`nstring`nnumber`n5`n0"
+    },
+    @{
+        Name = "modulo"
+        Args = @("-e", "print 10 % 3")
+        ExitCode = 0
+        Output = "1"
+    },
+    @{
+        Name = "builtins-len"
+        Args = @("-e", "print len([1, 2, 3])")
+        ExitCode = 0
+        Output = "3"
+    },
+    @{
+        Name = "builtins-type"
+        Args = @("-e", "print type([])")
+        ExitCode = 0
+        Output = "array"
+    },
+    @{
+        Name = "number-formatting"
+        Args = @("-e", "print 10 + 0")
+        ExitCode = 0
+        Output = "10"
     },
     @{
         Name = "top-level return"
