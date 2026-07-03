@@ -1,0 +1,43 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="paper" x1="30" y1="14" x2="102" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EAF2FB"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="82" y1="16" x2="110" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DDE8F2"/>
+      <stop offset="1" stop-color="#AEBFCC"/>
+    </linearGradient>
+    <linearGradient id="blueA" x1="21" y1="38" x2="73" y2="101" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0062D8"/>
+      <stop offset="0.55" stop-color="#00B8F5"/>
+      <stop offset="1" stop-color="#0056C7"/>
+    </linearGradient>
+    <linearGradient id="silver" x1="57" y1="84" x2="102" y2="35" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7F8E9C"/>
+      <stop offset="0.45" stop-color="#F5FAFF"/>
+      <stop offset="1" stop-color="#AAB7C3"/>
+    </linearGradient>
+    <linearGradient id="silverDark" x1="79" y1="75" x2="106" y2="103" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D3DBE5"/>
+      <stop offset="1" stop-color="#728293"/>
+    </linearGradient>
+    <filter id="shadow" x="10" y="8" width="108" height="112" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#0D2B44" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <path d="M28 14H82L108 40V114H28V14Z" fill="url(#paper)"/>
+    <path d="M82 14V40H108L82 14Z" fill="url(#fold)"/>
+    <path d="M30 14H82L108 40V114H28V14H30ZM32 18V110H104V42H80V18H32Z" fill="#1F5F91" fill-opacity="0.16"/>
+  </g>
+
+  <path d="M25 43H48L69 82L57 99L25 43Z" fill="url(#blueA)"/>
+  <path d="M48 43H65L78 67L69 82L48 43Z" fill="#00A7EF" fill-opacity="0.78"/>
+  <path d="M78 67L96 43H112L74 99L57 99L78 67Z" fill="url(#silver)"/>
+  <path d="M83 75L105 99H80L68 86L83 75Z" fill="url(#silverDark)"/>
+  <path d="M76 43H96L86 58L76 43Z" fill="#008BE9"/>
+
+  <path d="M39 102H89" stroke="#0B66C3" stroke-width="7" stroke-linecap="round"/>
+</svg>

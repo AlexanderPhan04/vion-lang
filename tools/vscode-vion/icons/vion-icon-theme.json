@@ -1,0 +1,13 @@
+{
+  "iconDefinitions": {
+    "_vion": {
+      "iconPath": "./vion-file-icon.svg"
+    }
+  },
+  "fileExtensions": {
+    "vion": "_vion"
+  },
+  "languageIds": {
+    "vion": "_vion"
+  }
+}

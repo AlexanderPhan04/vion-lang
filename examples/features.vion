@@ -1,0 +1,39 @@
+fn add(a, b) {
+  return a + b
+}
+
+fn fact(n) {
+  if n <= 1 {
+    return 1
+  }
+
+  return n * fact(n - 1)
+}
+
+fn makeAdder(x) {
+  fn addInner(y) {
+    return x + y
+  }
+
+  return addInner
+}
+
+let total = 0
+let index = 1
+
+while index <= 4 {
+  total = add(total, index)
+  index = index + 1
+}
+
+print total
+print fact(5)
+
+let addTwo = makeAdder(2)
+print addTwo(5)
+
+if total == 10 and true {
+  print "logic ok"
+} else {
+  print "logic failed"
+}

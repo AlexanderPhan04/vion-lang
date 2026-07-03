@@ -1,0 +1,109 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Vion",
+  "scopeName": "source.vion",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#functions"
+    },
+    {
+      "include": "#operators"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.vion",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.vion",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.vion",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.vion",
+          "match": "\\b\\d+(?:\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.vion",
+          "match": "\\b(?:if|else|while|return)\\b"
+        },
+        {
+          "name": "storage.type.function.vion",
+          "match": "\\bfn\\b"
+        },
+        {
+          "name": "storage.modifier.vion",
+          "match": "\\blet\\b"
+        },
+        {
+          "name": "support.function.builtin.vion",
+          "match": "\\bprint\\b"
+        },
+        {
+          "name": "keyword.operator.logical.vion",
+          "match": "\\b(?:and|or)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.vion",
+          "match": "\\b(?:true|false|nil)\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.vion",
+          "match": "(?<=\\bfn\\s+)[A-Za-z_][A-Za-z0-9_]*"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.vion",
+          "match": "==|!=|>=|<=|[+\\-*/=<>!]"
+        }
+      ]
+    }
+  }
+}

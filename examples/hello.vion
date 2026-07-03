@@ -1,0 +1,13 @@
+let name = "Vion"
+let x = 10
+let y = 20
+let total = x + y
+
+print name
+print total
+
+if total >= 30 {
+  print "total is valid"
+} else {
+  print "total is too small"
+}

@@ -1,0 +1,8 @@
+let name = "global"
+
+{
+  let name = "block"
+  print name
+}
+
+print name

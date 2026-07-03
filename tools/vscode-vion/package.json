@@ -1,0 +1,48 @@
+{
+  "name": "vion-language",
+  "displayName": "Vion Language",
+  "description": "Syntax highlighting and file icon support for .vion files.",
+  "version": "0.2.0",
+  "license": "MIT",
+  "publisher": "vionex",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "vion",
+        "aliases": [
+          "Vion",
+          "vion"
+        ],
+        "extensions": [
+          ".vion"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/vion-file-icon.svg",
+          "dark": "./icons/vion-file-icon.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "vion",
+        "scopeName": "source.vion",
+        "path": "./syntaxes/vion.tmLanguage.json"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "vion-file-icons",
+        "label": "Vion File Icons",
+        "path": "./icons/vion-icon-theme.json"
+      }
+    ]
+  }
+}

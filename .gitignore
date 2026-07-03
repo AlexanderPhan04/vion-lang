@@ -1,0 +1,40 @@
+# Build outputs
+build/
+**/build/
+out/
+dist/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# Visual Studio / MSBuild
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.user
+*.suo
+*.obj
+*.pdb
+*.ilk
+*.exe
+*.zip
+*.tar.gz
+*.7z
+*.vsix
+_CPack_Packages/
+**/_CPack_Packages/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
