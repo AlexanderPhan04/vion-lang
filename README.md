@@ -52,6 +52,14 @@ cmake --build build
 
 ## Install
 
+Online install without cloning:
+
+```powershell
+irm https://raw.githubusercontent.com/AlexanderPhan04/vion-lang/main/scripts/install-online-windows.ps1 | iex
+```
+
+Local source install:
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
 ```

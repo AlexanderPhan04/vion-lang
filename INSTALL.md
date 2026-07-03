@@ -8,7 +8,34 @@ vion main.vion
 
 ## Windows User Install
 
-From the repository root:
+### Online install without cloning
+
+After a GitHub Release is published with `vion-*-Windows.zip`, users can install Vion with one command:
+
+```powershell
+irm https://raw.githubusercontent.com/AlexanderPhan04/vion-lang/main/scripts/install-online-windows.ps1 | iex
+```
+
+Open a new terminal after installation, then verify:
+
+```powershell
+vion version
+vion main.vion
+```
+
+Run the same command again to update to the latest GitHub Release.
+
+Install a specific release tag:
+
+```powershell
+$installer = "$env:TEMP\install-vion.ps1"
+irm https://raw.githubusercontent.com/AlexanderPhan04/vion-lang/main/scripts/install-online-windows.ps1 -OutFile $installer
+powershell -ExecutionPolicy Bypass -File $installer -Version v0.2.0
+```
+
+### Local source install
+
+From a cloned repository root:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
@@ -88,4 +115,8 @@ cmake --build build --config Release
 cpack --config build\CPackConfig.cmake -C Release
 ```
 
-The generated `.zip` can be uploaded to a GitHub Release.
+The generated `.zip` can be uploaded to a GitHub Release. The online installer expects an asset name like:
+
+```text
+vion-0.2.0-Windows.zip
+```
