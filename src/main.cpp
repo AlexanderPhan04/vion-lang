@@ -76,6 +76,7 @@ static void printHelp() {
     std::cout << "  vion help                        Show help\n";
     std::cout << "  vion -h, --help                  Show help\n";
     std::cout << "  vion build <file.vion>           Build command placeholder\n";
+    std::cout << "  vion update                       Update Vion to the latest version\n";
 }
 
 static void printTokens(const std::string& source) {
@@ -120,7 +121,7 @@ static void startRepl() {
     Interpreter interpreter;
     std::string line;
 
-    std::cout << "Vion REPL v0.3.0\n";
+    std::cout << "Vion REPL v0.4.0\n";
     std::cout << "Type 'exit' or press Ctrl+Z then Enter to quit.\n";
 
     while (true) {
@@ -163,12 +164,31 @@ int main(int argc, char* argv[]) {
         }
 
         if (isOneOf(command, {"version", "--version", "-v"})) {
-            std::cout << "Vion v0.3.0\n";
+            std::cout << "Vion v0.4.0\n";
             return 0;
         }
 
         if (isOneOf(command, {"repl", "--interactive", "-i"})) {
             startRepl();
+            return 0;
+        }
+
+        if (isOneOf(command, {"update", "--update", "-u"})) {
+#ifdef _WIN32
+            std::cout << "Checking for updates...\n";
+            int ret = std::system(
+                "powershell -ExecutionPolicy Bypass -Command "
+                "\"irm https://raw.githubusercontent.com/AlexanderPhan04/vion-lang/main/scripts/install-online-windows.ps1 | iex\""
+            );
+            if (ret != 0) {
+                std::cerr << "Update failed. Check your internet connection or visit:\n";
+                std::cerr << "  https://github.com/AlexanderPhan04/vion-lang/releases\n";
+                return 1;
+            }
+#else
+            std::cout << "Auto-update is currently only supported on Windows.\n";
+            std::cout << "Visit https://github.com/AlexanderPhan04/vion-lang/releases to download manually.\n";
+#endif
             return 0;
         }
 
