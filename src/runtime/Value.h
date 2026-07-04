@@ -109,6 +109,8 @@ struct VionDB : public GCObject {
 };
 
 
+struct ObjUpvalue;  // forward declared in VM.h
+
 struct Value {
     ValueType type = ValueType::NIL;
     std::variant<
@@ -123,6 +125,10 @@ struct Value {
         std::shared_ptr<VionClass>,
         std::shared_ptr<VionInstance>
     > data;
+
+    // Closure upvalues: populated when this value is a BYTECODE_FUNCTION
+    // created by OP_CLOSURE with captured variables.
+    std::vector<std::shared_ptr<ObjUpvalue>> closureUpvalues;
 
     // ── Factories ──────────────────────────────────────────────────────────
 

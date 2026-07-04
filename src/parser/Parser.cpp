@@ -420,6 +420,68 @@ std::unique_ptr<Expr> Parser::factor() {
 }
 
 std::unique_ptr<Expr> Parser::unary() {
+    if (match(TokenType::PLUS_PLUS) || match(TokenType::MINUS_MINUS)) {
+        // Prefix ++x / --x -> x += 1 / x -= 1
+        std::string op = (previous().type == TokenType::PLUS_PLUS) ? "+" : "-";
+        int opLine = previous().line;
+        auto right = unary();
+        
+        auto one = std::make_unique<NumberExpr>(1.0, opLine);
+        // Desugar into assignment: right = right op 1
+        if (const auto* ident = dynamic_cast<const IdentifierExpr*>(right.get())) {
+            auto getRight = std::make_unique<IdentifierExpr>(ident->name, opLine);
+            auto binary = std::make_unique<BinaryExpr>(std::move(getRight), op, std::move(one), opLine);
+            return std::make_unique<AssignmentExpr>(ident->name, std::move(binary), opLine);
+        } else if (const auto* getExpr = dynamic_cast<const GetExpr*>(right.get())) {
+            // We do naive desugaring: obj.prop = obj.prop + 1
+            // Copy the object expression. To be safe, we assume it's simple (Identifier or Self)
+            std::unique_ptr<Expr> objCopy;
+            if (const auto* idObj = dynamic_cast<const IdentifierExpr*>(getExpr->object.get())) {
+                objCopy = std::make_unique<IdentifierExpr>(idObj->name, opLine);
+            } else if (const auto* selfObj = dynamic_cast<const SelfExpr*>(getExpr->object.get())) {
+                objCopy = std::make_unique<SelfExpr>(opLine);
+            } else {
+                errorAt(previous(), "Prefix operator requires simple property receiver.");
+                return right;
+            }
+            auto getLeft = std::make_unique<GetExpr>(std::move(objCopy), getExpr->name, opLine);
+            auto binary = std::make_unique<BinaryExpr>(std::move(getLeft), op, std::move(one), opLine);
+            
+            std::unique_ptr<Expr> setObj;
+            if (const auto* idObj = dynamic_cast<const IdentifierExpr*>(getExpr->object.get())) {
+                setObj = std::make_unique<IdentifierExpr>(idObj->name, opLine);
+            } else {
+                setObj = std::make_unique<SelfExpr>(opLine);
+            }
+            return std::make_unique<SetExpr>(std::move(setObj), getExpr->name, std::move(binary), opLine);
+        } else if (const auto* idxExpr = dynamic_cast<const IndexExpr*>(right.get())) {
+            // arr[idx] = arr[idx] + 1
+            std::unique_ptr<Expr> arrCopy, idxCopy1, arrCopy2, idxCopy2;
+            if (const auto* idArr = dynamic_cast<const IdentifierExpr*>(idxExpr->object.get())) {
+                arrCopy = std::make_unique<IdentifierExpr>(idArr->name, opLine);
+                arrCopy2 = std::make_unique<IdentifierExpr>(idArr->name, opLine);
+            } else {
+                errorAt(previous(), "Prefix operator requires simple array receiver.");
+                return right;
+            }
+            if (const auto* idIdx = dynamic_cast<const IdentifierExpr*>(idxExpr->index.get())) {
+                idxCopy1 = std::make_unique<IdentifierExpr>(idIdx->name, opLine);
+                idxCopy2 = std::make_unique<IdentifierExpr>(idIdx->name, opLine);
+            } else if (const auto* numIdx = dynamic_cast<const NumberExpr*>(idxExpr->index.get())) {
+                idxCopy1 = std::make_unique<NumberExpr>(numIdx->value, opLine);
+                idxCopy2 = std::make_unique<NumberExpr>(numIdx->value, opLine);
+            } else {
+                errorAt(previous(), "Prefix operator requires simple array index.");
+                return right;
+            }
+            auto getLeft = std::make_unique<IndexExpr>(std::move(arrCopy), std::move(idxCopy1), opLine);
+            auto binary = std::make_unique<BinaryExpr>(std::move(getLeft), op, std::move(one), opLine);
+            return std::make_unique<IndexAssignExpr>(std::move(arrCopy2), std::move(idxCopy2), std::move(binary), opLine);
+        }
+        errorAt(previous(), "Prefix operator requires a variable, property, or index.");
+        return right;
+    }
+
     if (match(TokenType::BANG) || match(TokenType::MINUS) || match(TokenType::TILDE)) {
         int opLine = previous().line;
         std::string op = previous().lexeme;
@@ -429,18 +491,70 @@ std::unique_ptr<Expr> Parser::unary() {
 
     auto expr = call();
 
-    // Postfix ++ / -- : desugar to x = x + 1
+    // Postfix ++ / --
+    // desugar x++ -> (x += 1) - 1
+    // desugar x-- -> (x -= 1) + 1
     if (match(TokenType::PLUS_PLUS) || match(TokenType::MINUS_MINUS)) {
         std::string op = (previous().type == TokenType::PLUS_PLUS) ? "+" : "-";
+        std::string invOp = (previous().type == TokenType::PLUS_PLUS) ? "-" : "+";
         int opLine = previous().line;
+        
+        auto one = std::make_unique<NumberExpr>(1.0, opLine);
+        std::unique_ptr<Expr> assignmentExpr;
+        
         if (const auto* ident = dynamic_cast<const IdentifierExpr*>(expr.get())) {
-            std::string varName = ident->name;
-            auto left   = std::make_unique<IdentifierExpr>(varName, opLine);
-            auto one    = std::make_unique<NumberExpr>(1.0, opLine);
-            auto binary = std::make_unique<BinaryExpr>(std::move(left), op, std::move(one), opLine);
-            return std::make_unique<AssignmentExpr>(varName, std::move(binary), opLine);
+            auto getRight = std::make_unique<IdentifierExpr>(ident->name, opLine);
+            auto binary = std::make_unique<BinaryExpr>(std::move(getRight), op, std::make_unique<NumberExpr>(1.0, opLine), opLine);
+            assignmentExpr = std::make_unique<AssignmentExpr>(ident->name, std::move(binary), opLine);
+        } else if (const auto* getExpr = dynamic_cast<const GetExpr*>(expr.get())) {
+            std::unique_ptr<Expr> objCopy;
+            if (const auto* idObj = dynamic_cast<const IdentifierExpr*>(getExpr->object.get())) {
+                objCopy = std::make_unique<IdentifierExpr>(idObj->name, opLine);
+            } else if (const auto* selfObj = dynamic_cast<const SelfExpr*>(getExpr->object.get())) {
+                objCopy = std::make_unique<SelfExpr>(opLine);
+            } else {
+                errorAt(previous(), "Postfix operator requires simple property receiver.");
+                return expr;
+            }
+            auto getLeft = std::make_unique<GetExpr>(std::move(objCopy), getExpr->name, opLine);
+            auto binary = std::make_unique<BinaryExpr>(std::move(getLeft), op, std::make_unique<NumberExpr>(1.0, opLine), opLine);
+            
+            std::unique_ptr<Expr> setObj;
+            if (const auto* idObj = dynamic_cast<const IdentifierExpr*>(getExpr->object.get())) {
+                setObj = std::make_unique<IdentifierExpr>(idObj->name, opLine);
+            } else {
+                setObj = std::make_unique<SelfExpr>(opLine);
+            }
+            assignmentExpr = std::make_unique<SetExpr>(std::move(setObj), getExpr->name, std::move(binary), opLine);
+        } else if (const auto* idxExpr = dynamic_cast<const IndexExpr*>(expr.get())) {
+            std::unique_ptr<Expr> arrCopy, idxCopy1, arrCopy2, idxCopy2;
+            if (const auto* idArr = dynamic_cast<const IdentifierExpr*>(idxExpr->object.get())) {
+                arrCopy = std::make_unique<IdentifierExpr>(idArr->name, opLine);
+                arrCopy2 = std::make_unique<IdentifierExpr>(idArr->name, opLine);
+            } else {
+                errorAt(previous(), "Postfix operator requires simple array receiver.");
+                return expr;
+            }
+            if (const auto* idIdx = dynamic_cast<const IdentifierExpr*>(idxExpr->index.get())) {
+                idxCopy1 = std::make_unique<IdentifierExpr>(idIdx->name, opLine);
+                idxCopy2 = std::make_unique<IdentifierExpr>(idIdx->name, opLine);
+            } else if (const auto* numIdx = dynamic_cast<const NumberExpr*>(idxExpr->index.get())) {
+                idxCopy1 = std::make_unique<NumberExpr>(numIdx->value, opLine);
+                idxCopy2 = std::make_unique<NumberExpr>(numIdx->value, opLine);
+            } else {
+                errorAt(previous(), "Postfix operator requires simple array index.");
+                return expr;
+            }
+            auto getLeft = std::make_unique<IndexExpr>(std::move(arrCopy), std::move(idxCopy1), opLine);
+            auto binary = std::make_unique<BinaryExpr>(std::move(getLeft), op, std::make_unique<NumberExpr>(1.0, opLine), opLine);
+            assignmentExpr = std::make_unique<IndexAssignExpr>(std::move(arrCopy2), std::move(idxCopy2), std::move(binary), opLine);
+        } else {
+            errorAt(previous(), "Postfix operator requires a variable, property, or index.");
+            return expr;
         }
-        errorAt(previous(), "'++' / '--' requires a variable.");
+        
+        // (x += 1) - 1
+        return std::make_unique<BinaryExpr>(std::move(assignmentExpr), invOp, std::move(one), opLine);
     }
 
     return expr;

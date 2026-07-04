@@ -1,0 +1,56 @@
+// Test 1: Basic closure — counter pattern
+fn counter() {
+    let count = 0
+    return fn() {
+        count += 1
+        return count
+    }
+}
+
+let c = counter()
+print c()  // 1
+print c()  // 2
+print c()  // 3
+
+// Test 2: Closure captures value at definition site
+fn make_greeting(prefix) {
+    return fn(name) {
+        return prefix + " " + name
+    }
+}
+
+let hello = make_greeting("Hello")
+let hi = make_greeting("Hi")
+print hello("World")  // Hello World
+print hi("Vion")      // Hi Vion
+
+// Test 3: Nested closures
+fn outer() {
+    let x = 10
+    fn middle() {
+        let y = 20
+        fn inner() {
+            return x + y
+        }
+        return inner()
+    }
+    return middle()
+}
+print outer()  // 30
+
+// Test 4: Multiple closures sharing variable
+fn make_pair() {
+    let x = 0
+    let getter = fn() { return x }
+    let setter = fn(v) { x = v }
+    return [getter, setter]
+}
+
+let pair = make_pair()
+let get = pair[0]
+let set = pair[1]
+print get()    // 0
+set(42)
+print get()    // 42 (shared mutation)
+
+print "closures ok"

@@ -246,6 +246,17 @@ struct LambdaExpr : Expr {
 
 // ── Statements ────────────────────────────────────────────────────────────────
 
+struct UpdateExpr : Expr {
+    std::string op;          // "++" or "--"
+    bool isPrefix;           // true for ++x, false for x++
+    std::unique_ptr<Expr> target; // IdentifierExpr, GetExpr, IndexExpr
+    UpdateExpr(std::string op, bool isPrefix, std::unique_ptr<Expr> target, int line = 0)
+        : op(std::move(op)), isPrefix(isPrefix), target(std::move(target)) { this->line = line; }
+    std::string toString() const override {
+        return isPrefix ? "(" + op + target->toString() + ")" : "(" + target->toString() + op + ")";
+    }
+};
+
 struct LetStmt : Stmt {
     std::string name;
     std::unique_ptr<Expr> value;

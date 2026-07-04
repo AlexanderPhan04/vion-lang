@@ -37,7 +37,7 @@ std::shared_ptr<BytecodeFunction> Compiler::endCompiler() {
 }
 
 void Compiler::emitByte(uint8_t byte) {
-    currentChunk()->write(byte, 0); // TODO: Line numbers
+    currentChunk()->write(byte, currentLine);
 }
 
 void Compiler::emitBytes(uint8_t byte1, uint8_t byte2) {
@@ -76,15 +76,19 @@ void Compiler::beginScope() {
 
 void Compiler::endScope() {
     scopeDepth--;
-    // Pop local variables from stack
+    // Pop local variables from stack — emit OP_CLOSE_UPVALUE for captured ones
     while (!locals.empty() && locals.back().depth > scopeDepth) {
-        emitByte(static_cast<uint8_t>(OpCode::OP_POP));
+        if (locals.back().isCaptured) {
+            emitByte(static_cast<uint8_t>(OpCode::OP_CLOSE_UPVALUE));
+        } else {
+            emitByte(static_cast<uint8_t>(OpCode::OP_POP));
+        }
         locals.pop_back();
     }
 }
 
-void Compiler::addLocal(const std::string& name) {
-    locals.push_back({name, scopeDepth});
+void Compiler::addLocal(const std::string& name, bool isConst) {
+    locals.push_back({name, scopeDepth, false, isConst});
 }
 
 int Compiler::resolveLocal(const std::string& name) {
@@ -96,7 +100,39 @@ int Compiler::resolveLocal(const std::string& name) {
     return -1;
 }
 
+int Compiler::resolveUpvalue(const std::string& name) {
+    if (!enclosing) return -1;
+    
+    // 1. Check enclosing's locals — direct capture
+    int local = enclosing->resolveLocal(name);
+    if (local != -1) {
+        enclosing->locals[local].isCaptured = true;
+        return addUpvalue(static_cast<uint8_t>(local), true, enclosing->locals[local].isConst);
+    }
+    
+    // 2. Check enclosing's upvalues — transitive capture (closure chain)
+    int upvalue = enclosing->resolveUpvalue(name);
+    if (upvalue != -1) {
+        return addUpvalue(static_cast<uint8_t>(upvalue), false, enclosing->upvalues[upvalue].isConst);
+    }
+    
+    return -1;
+}
+
+int Compiler::addUpvalue(uint8_t index, bool isLocal, bool isConst) {
+    // Deduplicate: check if we already capture this upvalue
+    for (int i = 0; i < static_cast<int>(upvalues.size()); i++) {
+        if (upvalues[i].index == index && upvalues[i].isLocal == isLocal) {
+            return i;
+        }
+    }
+    upvalues.push_back({index, isLocal, isConst});
+    function->upvalueCount = static_cast<int>(upvalues.size());
+    return static_cast<int>(upvalues.size()) - 1;
+}
+
 void Compiler::compileStatement(const Stmt& stmt) {
+    if (stmt.line > 0) currentLine = stmt.line;
     if (const auto* exprStmt = dynamic_cast<const ExpressionStmt*>(&stmt)) {
         compileExpression(*exprStmt->value);
         emitByte(static_cast<uint8_t>(OpCode::OP_POP));
@@ -125,7 +161,7 @@ void Compiler::compileStatement(const Stmt& stmt) {
             emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
         }
         if (scopeDepth > 0) {
-            addLocal(constStmt->name);
+            addLocal(constStmt->name, true);
         } else {
             int index = currentChunk()->addConstant(Value::string(constStmt->name));
             emitBytes(static_cast<uint8_t>(OpCode::OP_DEFINE_GLOBAL), static_cast<uint8_t>(index));
@@ -297,7 +333,11 @@ void Compiler::compileStatement(const Stmt& stmt) {
         std::shared_ptr<BytecodeFunction> compiledFunc = childCompiler.endCompiler();
         int funcIndex = currentChunk()->addConstant(Value::bytecodeFunction(compiledFunc));
         emitBytes(static_cast<uint8_t>(OpCode::OP_CLOSURE), static_cast<uint8_t>(funcIndex));
-        
+        // Emit upvalue descriptors for the closure
+        for (const auto& uv : childCompiler.upvalues) {
+            emitByte(uv.isLocal ? 1 : 0);
+            emitByte(uv.index);
+        }        
         if (scopeDepth > 0) {
             addLocal(funcStmt->name);
         } else {
@@ -387,6 +427,11 @@ void Compiler::compileStatement(const Stmt& stmt) {
             auto compiledFunc = childCompiler.endCompiler();
             int funcIdx = currentChunk()->addConstant(Value::bytecodeFunction(compiledFunc));
             emitBytes(static_cast<uint8_t>(OpCode::OP_CLOSURE), static_cast<uint8_t>(funcIdx));
+            // Emit upvalue descriptors for the method closure
+            for (const auto& uv : childCompiler.upvalues) {
+                emitByte(uv.isLocal ? 1 : 0);
+                emitByte(uv.index);
+            }
             // OP_METHOD <method_name_idx> <is_static>
             int mNameIdx = currentChunk()->addConstant(Value::string(method.name));
             emitBytes(static_cast<uint8_t>(OpCode::OP_METHOD), static_cast<uint8_t>(mNameIdx));
@@ -410,6 +455,7 @@ void Compiler::compileStatement(const Stmt& stmt) {
 }
 
 void Compiler::compileExpression(const Expr& expr) {
+    if (expr.line > 0) currentLine = expr.line;
     if (const auto* numExpr = dynamic_cast<const NumberExpr*>(&expr)) {
         emitConstant(Value::number(numExpr->value));
     } else if (const auto* strExpr = dynamic_cast<const StringExpr*>(&expr)) {
@@ -478,17 +524,33 @@ void Compiler::compileExpression(const Expr& expr) {
         if (localArg != -1) {
             emitBytes(static_cast<uint8_t>(OpCode::OP_GET_LOCAL), static_cast<uint8_t>(localArg));
         } else {
-            int index = currentChunk()->addConstant(Value::string(idExpr->name));
-            emitBytes(static_cast<uint8_t>(OpCode::OP_GET_GLOBAL), static_cast<uint8_t>(index));
+            int upvalueArg = resolveUpvalue(idExpr->name);
+            if (upvalueArg != -1) {
+                emitBytes(static_cast<uint8_t>(OpCode::OP_GET_UPVALUE), static_cast<uint8_t>(upvalueArg));
+            } else {
+                int index = currentChunk()->addConstant(Value::string(idExpr->name));
+                emitBytes(static_cast<uint8_t>(OpCode::OP_GET_GLOBAL), static_cast<uint8_t>(index));
+            }
         }
     } else if (const auto* assignExpr = dynamic_cast<const AssignmentExpr*>(&expr)) {
         compileExpression(*assignExpr->value);
         int localArg = resolveLocal(assignExpr->name);
         if (localArg != -1) {
+            if (locals[localArg].isConst) {
+                throw std::runtime_error("Compile Error: Cannot reassign to const variable '" + assignExpr->name + "'.");
+            }
             emitBytes(static_cast<uint8_t>(OpCode::OP_SET_LOCAL), static_cast<uint8_t>(localArg));
         } else {
-            int index = currentChunk()->addConstant(Value::string(assignExpr->name));
-            emitBytes(static_cast<uint8_t>(OpCode::OP_SET_GLOBAL), static_cast<uint8_t>(index));
+            int upvalueArg = resolveUpvalue(assignExpr->name);
+            if (upvalueArg != -1) {
+                if (upvalues[upvalueArg].isConst) {
+                    throw std::runtime_error("Compile Error: Cannot reassign to const variable '" + assignExpr->name + "'.");
+                }
+                emitBytes(static_cast<uint8_t>(OpCode::OP_SET_UPVALUE), static_cast<uint8_t>(upvalueArg));
+            } else {
+                int index = currentChunk()->addConstant(Value::string(assignExpr->name));
+                emitBytes(static_cast<uint8_t>(OpCode::OP_SET_GLOBAL), static_cast<uint8_t>(index));
+            }
         }
     } else if (const auto* callExpr = dynamic_cast<const CallExpr*>(&expr)) {
         if (const auto* getExpr = dynamic_cast<const GetExpr*>(callExpr->callee.get())) {
@@ -620,6 +682,11 @@ void Compiler::compileExpression(const Expr& expr) {
         auto compiledFunc = childCompiler.endCompiler();
         int funcIndex = currentChunk()->addConstant(Value::bytecodeFunction(compiledFunc));
         emitBytes(static_cast<uint8_t>(OpCode::OP_CLOSURE), static_cast<uint8_t>(funcIndex));
+        // Emit upvalue descriptors for the lambda closure
+        for (const auto& uv : childCompiler.upvalues) {
+            emitByte(uv.isLocal ? 1 : 0);
+            emitByte(uv.index);
+        }
     } else if (dynamic_cast<const SelfExpr*>(&expr)) {
         // 'self' is stored as a local named "self" in method scope
         int localArg = resolveLocal("self");

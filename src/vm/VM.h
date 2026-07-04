@@ -18,6 +18,7 @@ enum class InterpretResult {
 struct BytecodeFunction : public GCObject {
     int arity = 0;
     int requiredArity = 0;  // params without defaults
+    int upvalueCount = 0;   // number of upvalues this function captures
     std::shared_ptr<Chunk> chunk;
     std::string name;
     
@@ -29,10 +30,19 @@ struct BytecodeFunction : public GCObject {
     void breakCycles() override { chunk.reset(); }
 };
 
+// Upvalue: a heap-allocated box for captured variables.
+// Shared between the enclosing scope and any closures that capture it.
+struct ObjUpvalue {
+    Value value;
+    ObjUpvalue() : value(Value::nil()) {}
+    explicit ObjUpvalue(Value v) : value(std::move(v)) {}
+};
+
 struct CallFrame {
     std::shared_ptr<BytecodeFunction> function;
     uint8_t* ip;
     int slots_base;
+    std::vector<std::shared_ptr<ObjUpvalue>> upvalues; // captured variables for this closure
 };
 
 struct TryHandler {
@@ -51,6 +61,7 @@ public:
     Value pop();
 
     void defineNative(const std::string& name, NativeFn function);
+    Value callFunction(Value callee, int argCount, Value* args);
 
 private:
     bool handleError(const std::string& message);
@@ -62,9 +73,13 @@ private:
     
     std::unordered_map<std::string, Value> globals;
     std::vector<std::string> scriptArgs;  // CLI args passed to script
+    
+    // Open upvalues: maps stack index → shared upvalue box.
+    // Ensures two closures capturing the same local share the same box.
+    std::unordered_map<int, std::shared_ptr<ObjUpvalue>> openUpvalues;
 
     uint8_t readByte();
     uint16_t readShort();
     Value readConstant();
-    InterpretResult run();
+    InterpretResult run(int targetDepth = 0);
 };

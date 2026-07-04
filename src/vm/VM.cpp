@@ -997,8 +997,99 @@ VM::VM() {
         arr->elements.erase(arr->elements.begin()+idx);
         return removed;
     });
+    defineNative("arr_map", [this](int n, Value* a) -> Value {
+        if (n!=2||a[0].type!=ValueType::ARRAY||a[1].type!=ValueType::BYTECODE_FUNCTION) return Value::array();
+        auto arr=std::get<std::shared_ptr<VionArray>>(a[0].data);
+        Value callee = a[1]; // COPY to avoid dangling pointer if stack reallocates
+        auto result=std::make_shared<VionArray>();
+        for(size_t i=0;i<arr->elements.size();i++){
+            Value args[2] = { arr->elements[i], Value::number(i) };
+            result->elements.push_back(this->callFunction(callee, 2, args));
+        }
+        return Value::array(result);
+    });
+    defineNative("arr_filter", [this](int n, Value* a) -> Value {
+        if (n!=2||a[0].type!=ValueType::ARRAY||a[1].type!=ValueType::BYTECODE_FUNCTION) return Value::array();
+        auto arr=std::get<std::shared_ptr<VionArray>>(a[0].data);
+        Value callee = a[1];
+        auto result=std::make_shared<VionArray>();
+        for(size_t i=0;i<arr->elements.size();i++){
+            Value args[2] = { arr->elements[i], Value::number(i) };
+            if (this->callFunction(callee, 2, args).isTruthy()) {
+                result->elements.push_back(arr->elements[i]);
+            }
+        }
+        return Value::array(result);
+    });
+    defineNative("arr_reduce", [this](int n, Value* a) -> Value {
+        if (n<2||a[0].type!=ValueType::ARRAY||a[1].type!=ValueType::BYTECODE_FUNCTION) return Value::nil();
+        auto arr=std::get<std::shared_ptr<VionArray>>(a[0].data);
+        Value callee = a[1];
+        Value acc = (n>=3) ? a[2] : (arr->elements.empty() ? Value::nil() : arr->elements[0]);
+        size_t start = (n>=3) ? 0 : 1;
+        for(size_t i=start;i<arr->elements.size();i++){
+            Value args[3] = { acc, arr->elements[i], Value::number(i) };
+            acc = this->callFunction(callee, 3, args);
+        }
+        return acc;
+    });
 
     // ── Map ───────────────────────────────────────────────────────────────────
+    defineNative("arr_reverse", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::ARRAY) return a[0];
+        auto arr=std::get<std::shared_ptr<VionArray>>(a[0].data);
+        std::reverse(arr->elements.begin(), arr->elements.end());
+        return a[0];
+    });
+    defineNative("arr_slice", [](int n, Value* a) -> Value {
+        if (n<2||a[0].type!=ValueType::ARRAY||a[1].type!=ValueType::NUMBER) return Value::array();
+        auto arr=std::get<std::shared_ptr<VionArray>>(a[0].data);
+        int start = static_cast<int>(std::get<double>(a[1].data));
+        int end = (n>=3 && a[2].type==ValueType::NUMBER) ? static_cast<int>(std::get<double>(a[2].data)) : static_cast<int>(arr->elements.size());
+        if (start < 0) start += arr->elements.size();
+        if (end < 0) end += arr->elements.size();
+        start = std::max(0, std::min(start, static_cast<int>(arr->elements.size())));
+        end = std::max(0, std::min(end, static_cast<int>(arr->elements.size())));
+        auto result=std::make_shared<VionArray>();
+        for(int i=start;i<end;i++) result->elements.push_back(arr->elements[i]);
+        return Value::array(result);
+    });
+    defineNative("arr_contains", [](int n, Value* a) -> Value {
+        if (n!=2||a[0].type!=ValueType::ARRAY) return Value::boolean(false);
+        auto arr=std::get<std::shared_ptr<VionArray>>(a[0].data);
+        for(const auto& el : arr->elements) {
+            if (el.toString() == a[1].toString()) return Value::boolean(true);
+        }
+        return Value::boolean(false);
+    });
+    defineNative("arr_insert", [](int n, Value* a) -> Value {
+        if (n!=3||a[0].type!=ValueType::ARRAY||a[1].type!=ValueType::NUMBER) return a[0];
+        auto arr=std::get<std::shared_ptr<VionArray>>(a[0].data);
+        int idx = static_cast<int>(std::get<double>(a[1].data));
+        if (idx < 0) idx += arr->elements.size();
+        idx = std::max(0, std::min(idx, static_cast<int>(arr->elements.size())));
+        arr->elements.insert(arr->elements.begin() + idx, a[2]);
+        return a[0];
+    });
+    defineNative("arr_sort", [this](int n, Value* a) -> Value {
+        if (n<1||a[0].type!=ValueType::ARRAY) return a[0];
+        auto arr=std::get<std::shared_ptr<VionArray>>(a[0].data);
+        if (n>=2 && a[1].type==ValueType::BYTECODE_FUNCTION) {
+            Value callee = a[1];
+            std::stable_sort(arr->elements.begin(), arr->elements.end(), [this, callee](const Value& x, const Value& y) {
+                Value args[2] = { x, y };
+                Value res = const_cast<VM*>(this)->callFunction(callee, 2, args);
+                if (res.type == ValueType::NUMBER) return std::get<double>(res.data) < 0;
+                return res.isTruthy();
+            });
+        } else {
+            std::stable_sort(arr->elements.begin(), arr->elements.end(), [](const Value& x, const Value& y) {
+                if (x.type == ValueType::NUMBER && y.type == ValueType::NUMBER) return std::get<double>(x.data) < std::get<double>(y.data);
+                return x.toString() < y.toString();
+            });
+        }
+        return a[0];
+    });
     defineNative("keys", [](int n, Value* a) -> Value {
         if (n!=1||a[0].type!=ValueType::MAP) return Value::array();
         auto& entries=std::get<std::shared_ptr<VionMap>>(a[0].data)->entries;
@@ -1172,6 +1263,19 @@ Value VM::pop() {
 bool VM::handleError(const std::string& message) {
     if (tryHandlers.empty()) {
         std::cerr << "Runtime Error: " << message << "\n";
+        for (int i = frames.size() - 1; i >= 0; i--) {
+            CallFrame* frame = &frames[i];
+            std::shared_ptr<BytecodeFunction> function = frame->function;
+            size_t instruction = frame->ip - function->chunk->code.data() - 1;
+            int line = (instruction < function->chunk->lines.size()) ? function->chunk->lines[instruction] : 0;
+            
+            std::cerr << "[line " << line << "] in ";
+            if (function->name.empty()) {
+                std::cerr << "script\n";
+            } else {
+                std::cerr << function->name << "()\n";
+            }
+        }
         return false;
     }
     
@@ -1210,7 +1314,7 @@ InterpretResult VM::interpret(std::shared_ptr<BytecodeFunction> function, const 
     frame.ip = function->chunk->code.data();
     frame.slots_base = 0;
     frames.push_back(frame);
-    return run();
+    return run(0);
 }
 
 void VM::defineNative(const std::string& name, NativeFn function) {
@@ -1220,7 +1324,35 @@ void VM::defineNative(const std::string& name, NativeFn function) {
     globals[name] = Value::nativeFunction(native);
 }
 
-InterpretResult VM::run() {
+Value VM::callFunction(Value callee, int argCount, Value* args) {
+    if (callee.type != ValueType::BYTECODE_FUNCTION) return Value::nil();
+    auto function = std::get<std::shared_ptr<BytecodeFunction>>(callee.data);
+    
+    int startDepth = static_cast<int>(frames.size());
+    
+    push(callee);
+    for (int i = 0; i < argCount; ++i) {
+        push(args[i]);
+    }
+    
+    for (int i = argCount; i < function->arity; i++) push(Value::nil());
+    
+    CallFrame frame;
+    frame.function = function;
+    frame.ip = function->chunk->code.data();
+    frame.slots_base = stack.size() - function->arity - 1;
+    frame.upvalues = callee.closureUpvalues;
+    frames.push_back(frame);
+    
+    InterpretResult result = run(startDepth);
+    if (result != InterpretResult::INTERPRET_OK) {
+        std::cerr << "Native callback execution failed." << std::endl;
+        throw std::runtime_error("Callback execution failed.");
+    }
+    return pop();
+}
+
+InterpretResult VM::run(int targetDepth) {
     for (;;) {
         uint8_t instruction;
         switch (instruction = readByte()) {
@@ -1267,8 +1399,7 @@ InterpretResult VM::run() {
                     newArr->elements.insert(newArr->elements.end(), arrB->elements.begin(), arrB->elements.end());
                     push(Value::array(newArr));
                 } else {
-                    std::cerr << "Runtime Error: operands must be numbers or arrays, or at least one must be a string.\n";
-                    return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                    if (!handleError("operands must be numbers or arrays, or at least one must be a string.")) return InterpretResult::INTERPRET_RUNTIME_ERROR; break;
                 }
                 break;
             }
@@ -1304,8 +1435,7 @@ InterpretResult VM::run() {
                 if (a.type != ValueType::NUMBER || b.type != ValueType::NUMBER) return InterpretResult::INTERPRET_RUNTIME_ERROR;
                 double denominator = std::get<double>(b.data);
                 if (denominator == 0) {
-                    std::cerr << "Runtime Error: modulo by zero.\n";
-                    return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                    if (!handleError("modulo by zero.")) return InterpretResult::INTERPRET_RUNTIME_ERROR; break;
                 }
                 push(Value::number(std::fmod(std::get<double>(a.data), denominator)));
                 break;
@@ -1345,8 +1475,7 @@ InterpretResult VM::run() {
                 std::string key = name.toString();
                 auto it = globals.find(key);
                 if (it == globals.end()) {
-                    std::cerr << "Runtime Error: Undefined variable '" << key << "'.\n";
-                    return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                    if (!handleError("Undefined variable '" + key + "'.")) return InterpretResult::INTERPRET_RUNTIME_ERROR; break;
                 }
                 push(it->second);
                 break;
@@ -1355,8 +1484,7 @@ InterpretResult VM::run() {
                 Value name = readConstant();
                 std::string key = name.toString();
                 if (globals.find(key) == globals.end()) {
-                    std::cerr << "Runtime Error: Undefined variable '" << key << "'.\n";
-                    return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                    if (!handleError("Undefined variable '" + key + "'.")) return InterpretResult::INTERPRET_RUNTIME_ERROR; break;
                 }
                 globals[key] = stack.back(); // peek, don't pop for assignment
                 break;
@@ -1402,10 +1530,55 @@ InterpretResult VM::run() {
                 tryHandlers.pop_back();
                 break;
             }
+            case static_cast<uint8_t>(OpCode::OP_GET_UPVALUE): {
+                uint8_t slot = readByte();
+                push(frames.back().upvalues[slot]->value);
+                break;
+            }
+            case static_cast<uint8_t>(OpCode::OP_SET_UPVALUE): {
+                uint8_t slot = readByte();
+                frames.back().upvalues[slot]->value = stack.back();
+                break;
+            }
+            case static_cast<uint8_t>(OpCode::OP_CLOSE_UPVALUE): {
+                // Close the topmost stack value: snapshot it into its upvalue box
+                int stackIdx = static_cast<int>(stack.size()) - 1;
+                auto it = openUpvalues.find(stackIdx);
+                if (it != openUpvalues.end()) {
+                    it->second->value = stack.back();
+                    openUpvalues.erase(it);
+                }
+                stack.pop_back();
+                break;
+            }
             case static_cast<uint8_t>(OpCode::OP_CLOSURE): {
                 Value constant = readConstant();
                 auto function = std::get<std::shared_ptr<BytecodeFunction>>(constant.data);
-                push(Value::bytecodeFunction(function));
+                Value closureVal = Value::bytecodeFunction(function);
+                // Read upvalue descriptors and capture variables
+                for (int i = 0; i < function->upvalueCount; i++) {
+                    uint8_t isLocal = readByte();
+                    uint8_t index = readByte();
+                    if (isLocal) {
+                        // Capture from enclosing frame's stack
+                        int stackIdx = frames.back().slots_base + index;
+                        auto it = openUpvalues.find(stackIdx);
+                        if (it != openUpvalues.end()) {
+                            // Reuse existing upvalue box (shared capture)
+                            closureVal.closureUpvalues.push_back(it->second);
+                        } else {
+                            // Create new upvalue box with current stack value
+                            auto uv = std::make_shared<ObjUpvalue>(stack[stackIdx]);
+                            openUpvalues[stackIdx] = uv;
+                            closureVal.closureUpvalues.push_back(uv);
+                        }
+                    } else {
+                        // Capture from enclosing frame's upvalue list (transitive)
+                        closureVal.closureUpvalues.push_back(
+                            frames.back().upvalues[index]);
+                    }
+                }
+                push(closureVal);
                 break;
             }
             case static_cast<uint8_t>(OpCode::OP_CALL): {
@@ -1427,6 +1600,8 @@ InterpretResult VM::run() {
                     frame.function = function;
                     frame.ip = function->chunk->code.data();
                     frame.slots_base = stack.size() - function->arity - 1;
+                    // Transfer closure upvalues into the new frame
+                    frame.upvalues = callee.closureUpvalues;
                     frames.push_back(frame);
                 } else if (callee.type == ValueType::CLASS) {
                     // Instantiate class: replace CLASS value on stack with new INSTANCE
@@ -1469,8 +1644,7 @@ InterpretResult VM::run() {
                     stack.erase(stack.begin() + stack.size() - argCount - 1, stack.end());
                     push(result);
                 } else {
-                    std::cerr << "Runtime Error: Can only call functions.\n";
-                    return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                    if (!handleError("Can only call functions.")) return InterpretResult::INTERPRET_RUNTIME_ERROR; break;
                 }
                 break;
             }
@@ -1478,9 +1652,29 @@ InterpretResult VM::run() {
                 Value result = pop();
                 CallFrame frame = frames.back();
                 frames.pop_back();
-                if (frames.empty()) {
-                    pop(); // pop the script function
-                    return InterpretResult::INTERPRET_OK;
+                
+                // Close all open upvalues in this frame's stack range
+                for (auto it = openUpvalues.begin(); it != openUpvalues.end(); ) {
+                    if (it->first >= frame.slots_base) {
+                        if (it->first < static_cast<int>(stack.size())) {
+                            it->second->value = stack[it->first];
+                        }
+                        it = openUpvalues.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+                
+                if (frames.size() == targetDepth) {
+                    if (targetDepth == 0) {
+                        pop(); // pop the script function only for main loop
+                        return InterpretResult::INTERPRET_OK;
+                    } else {
+                        // For nested execution, we still need to clean the stack and return the result
+                        stack.erase(stack.begin() + frame.slots_base, stack.end());
+                        push(result);
+                        return InterpretResult::INTERPRET_OK;
+                    }
                 }
                 // If returning from 'init', always return self (instance at slot 0)
                 if (frame.function->name == "init" && frame.slots_base < stack.size()) {
@@ -1536,8 +1730,7 @@ InterpretResult VM::run() {
                         push(Value::nil());
                     }
                 } else {
-                    std::cerr << "Runtime Error: Invalid index get operation.\n";
-                    return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                    if (!handleError("Invalid index get operation.")) return InterpretResult::INTERPRET_RUNTIME_ERROR; break;
                 }
                 break;
             }
@@ -1552,16 +1745,14 @@ InterpretResult VM::run() {
                         arr->elements[idx] = value;
                         push(value);
                     } else {
-                        std::cerr << "Runtime Error: Array index out of bounds.\n";
-                        return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                        if (!handleError("Array index out of bounds.")) return InterpretResult::INTERPRET_RUNTIME_ERROR; break;
                     }
                 } else if (obj.type == ValueType::MAP && index.type == ValueType::STRING) {
                     auto map = std::get<std::shared_ptr<VionMap>>(obj.data);
                     map->entries[index.toString()] = value;
                     push(value);
                 } else {
-                    std::cerr << "Runtime Error: Invalid index set operation.\n";
-                    return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                    if (!handleError("Invalid index set operation.")) return InterpretResult::INTERPRET_RUNTIME_ERROR; break;
                 }
                 break;
             }
@@ -1592,8 +1783,7 @@ InterpretResult VM::run() {
                     auto it = klass->statics.find(propName);
                     push(it != klass->statics.end() ? it->second : Value::nil());
                 } else {
-                    std::cerr << "Runtime Error: Only instances, maps, and classes support property access.\n";
-                    return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                    if (!handleError("Only instances, maps, and classes support property access.")) return InterpretResult::INTERPRET_RUNTIME_ERROR; break;
                 }
                 break;
             }
@@ -1612,8 +1802,7 @@ InterpretResult VM::run() {
                     map->entries[propName] = value;
                     push(value);
                 } else {
-                    std::cerr << "Runtime Error: Only instances and maps support property assignment.\n";
-                    return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                    if (!handleError("Only instances and maps support property assignment.")) return InterpretResult::INTERPRET_RUNTIME_ERROR; break;
                 }
                 break;
             }
@@ -1740,8 +1929,7 @@ InterpretResult VM::run() {
                 break;
             }
             default:
-                std::cerr << "Runtime Error: Unknown OpCode: " << static_cast<int>(instruction) << "\n";
-                return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                if (!handleError("Unknown OpCode: " + std::to_string(static_cast<int>(instruction)) + "")) return InterpretResult::INTERPRET_RUNTIME_ERROR; break;
             // ── Class System ──────────────────────────────────────────────────
             case static_cast<uint8_t>(OpCode::OP_CLASS): {
                 Value nameVal = readConstant();
@@ -1756,8 +1944,7 @@ InterpretResult VM::run() {
                 Value method = pop(); // the function
                 Value classVal = stack.back(); // peek
                 if (classVal.type != ValueType::CLASS) {
-                    std::cerr << "Runtime Error: OP_METHOD on non-class.\n";
-                    return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                    if (!handleError("OP_METHOD on non-class.")) return InterpretResult::INTERPRET_RUNTIME_ERROR; break;
                 }
                 auto klass = std::get<std::shared_ptr<VionClass>>(classVal.data);
                 if (isStatic) klass->statics[nameVal.toString()] = method;
@@ -1769,8 +1956,7 @@ InterpretResult VM::run() {
                 Value subclassVal = pop();
                 Value superclassVal = stack.back(); // peek super
                 if (superclassVal.type != ValueType::CLASS || subclassVal.type != ValueType::CLASS) {
-                    std::cerr << "Runtime Error: Superclass must be a class.\n";
-                    return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                    if (!handleError("Superclass must be a class.")) return InterpretResult::INTERPRET_RUNTIME_ERROR; break;
                 }
                 auto super = std::get<std::shared_ptr<VionClass>>(superclassVal.data);
                 auto sub = std::get<std::shared_ptr<VionClass>>(subclassVal.data);
@@ -1841,3 +2027,5 @@ InterpretResult VM::run() {
         }
     }
 }
+
+

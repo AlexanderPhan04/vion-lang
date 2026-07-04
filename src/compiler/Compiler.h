@@ -8,6 +8,15 @@
 struct Local {
     std::string name;
     int depth;
+    bool isCaptured = false; // true if captured by a closure
+    bool isConst = false;    // true if defined with 'const'
+};
+
+// Describes how a closure captures a variable
+struct CompilerUpvalue {
+    uint8_t index;   // local index (if isLocal) or upvalue index in enclosing function
+    bool isLocal;    // true = capture from enclosing locals, false = from enclosing upvalues
+    bool isConst;    // true = captured variable is const
 };
 
 enum class FunctionType {
@@ -29,14 +38,17 @@ public:
     std::shared_ptr<BytecodeFunction> compile(const Program& program);
     std::shared_ptr<BytecodeFunction> endCompiler();
 
+    // Public for class method compilation
+    std::vector<Local> locals;
+
 private:
     Compiler* enclosing;
     std::shared_ptr<BytecodeFunction> function;
     FunctionType type;
 
-    std::vector<Local> locals;
     int scopeDepth;
     std::vector<LoopInfo> loops;
+    std::vector<CompilerUpvalue> upvalues; // upvalues captured by this function
 
     Chunk* currentChunk();
 
@@ -50,9 +62,13 @@ private:
 
     void beginScope();
     void endScope();
-    void addLocal(const std::string& name);
+    void addLocal(const std::string& name, bool isConst = false);
     int resolveLocal(const std::string& name);
+    int resolveUpvalue(const std::string& name);
+    int addUpvalue(uint8_t index, bool isLocal, bool isConst);
 
     void compileStatement(const Stmt& stmt);
     void compileExpression(const Expr& expr);
+    
+    int currentLine = 0;
 };

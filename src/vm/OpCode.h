@@ -56,6 +56,9 @@ enum class OpCode : uint8_t {
     // Functions/Closures
     OP_CALL,
     OP_CLOSURE,
+    OP_GET_UPVALUE,   // Read captured variable
+    OP_SET_UPVALUE,   // Write captured variable
+    OP_CLOSE_UPVALUE, // Close over local when it goes out of scope
     OP_RETURN,
 
     // Collections
