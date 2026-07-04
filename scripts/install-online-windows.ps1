@@ -473,10 +473,7 @@ try {
     Write-Color "  Repo  →  https://github.com/AlexanderPhan04/vion-lang" -Color DarkGray
     Write-Host ""
 
-    if (!$NoOpen -and !$NoStarter) {
-        Open-StarterProject -Directory $StarterDir
-    }
-
+    # Removed auto-opening in VS Code to avoid interrupting user workflow
 } catch {
     Stop-Spin -Fail -DoneMsg "Error: $_" 2>$null
     Write-Host ""
