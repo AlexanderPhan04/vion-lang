@@ -104,7 +104,7 @@ $Cases = @(
         Name = "runtime error"
         Args = @("run", (Join-Path $ProjectRoot "tests\cases\runtime-error.vion"))
         ExitCode = 1
-        Output = "Runtime Error: division by zero."
+        Output = "Runtime Error: division by zero.`n[line 1] in script"
     },
     @{
         Name = "arrays"
