@@ -1,5 +1,5 @@
 param(
-    [string]$Repo          = "AlexanderPhan04/vion-lang",
+    [string]$Repo          = "VionexSoftware/vion-lang",
     [string]$Version       = "latest",
     [string]$InstallDir    = "",
     [string]$StarterDir    = "",
@@ -470,7 +470,7 @@ try {
     Write-Color "    " -NoNewline; Write-Color "vion" -Color Cyan -NoNewline; Write-Color " repl" -Color DarkGray
     Write-Host ""
     Write-Color "  Docs  →  https://vion.vionex.software" -Color DarkGray
-    Write-Color "  Repo  →  https://github.com/AlexanderPhan04/vion-lang" -Color DarkGray
+    Write-Color "  Repo  →  https://github.com/VionexSoftware/vion-lang" -Color DarkGray
     Write-Host ""
 
     # Removed auto-opening in VS Code to avoid interrupting user workflow
