@@ -426,7 +426,7 @@ try {
     if (!$NoPath)    { $PathAdded = Add-UserPathEntry -PathEntry $BinDir }
 
     Save-InstallManifest -Manifest @{
-        Version                  = "0.4.0"
+        Version                  = "1.0.0"
         InstalledAt              = (Get-Date).ToString("o")
         InstallDir               = [System.IO.Path]::GetFullPath($InstallDir)
         BinDir                   = [System.IO.Path]::GetFullPath($BinDir)
