@@ -10,7 +10,7 @@
   </p>
 </div>
 
-Vion is a powerful, dynamically typed scripting language built entirely from scratch in modern C++17. Originally started as a learning project for language implementation (Lexer, Parser, AST), Vion has evolved into a fully-fledged language running on a custom **Bytecode Virtual Machine**.
+Vion is an open-source scripting language created by Phan Nhật Quân and maintained by Vionex Software. It is a dynamically typed, experimental language built entirely from scratch in modern C++17. Originally started as a learning project for language implementation (Lexer, Parser, AST), Vion has evolved into a fully-fledged language running on a custom **Bytecode Virtual Machine**.
 
 ## 🚀 Features (v1.0.0)
 
@@ -27,11 +27,25 @@ Vion is a powerful, dynamically typed scripting language built entirely from scr
 ## ⚡ Quick Start
 
 ### Installation (Windows)
-Open PowerShell as Administrator and run:
+Open PowerShell (**no administrator privileges required**) and run the quick installer:
 ```powershell
 irm https://raw.githubusercontent.com/AlexanderPhan04/vion-lang/main/scripts/install-online-windows.ps1 | iex
 ```
-This will download the latest `vion.exe`, add it to your PATH, and install the VS Code syntax highlighting extension.
+
+*(For better security, you can download and review the script before running it):*
+```powershell
+irm https://raw.githubusercontent.com/AlexanderPhan04/vion-lang/main/scripts/install-online-windows.ps1 -OutFile install-vion.ps1
+notepad .\install-vion.ps1
+powershell -ExecutionPolicy Bypass -File .\install-vion.ps1
+```
+
+This will download the latest `vion.exe`, add it to your User PATH, and install the VS Code syntax highlighting extension.
+
+#### Uninstallation
+To completely remove Vion and its VS Code extension, run:
+```powershell
+irm https://raw.githubusercontent.com/AlexanderPhan04/vion-lang/main/scripts/uninstall-windows.ps1 | iex
+```
 
 ### Hello World
 ```javascript
@@ -68,6 +82,15 @@ config.environment = "production"
 
 let jsonStr = json_stringify(config)
 print jsonStr
+```
+
+### File I/O
+```javascript
+let content = "Log started at " + os_env("USERNAME")
+write_file("server.log", content)
+
+let readBack = read_file("server.log")
+print readBack
 ```
 
 ### Functions & Closures
@@ -139,4 +162,4 @@ Vion ships with a helpful CLI for debugging and running code:
 ---
 
 ## 📄 License
-MIT License. Created by Vionex Software.
+MIT License. Created by Phan Nhật Quân and maintained by Vionex Software.
