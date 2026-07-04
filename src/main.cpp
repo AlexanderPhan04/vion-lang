@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "interpreter/Interpreter.h"
 #include "lexer/Lexer.h"
 #include "lexer/Token.h"
 #include "parser/Parser.h"
@@ -107,11 +106,23 @@ static void printAst(const std::string& source) {
     std::cout << program.toString();
 }
 
+#include "vm/VM.h"
+#include "compiler/Compiler.h"
+
 static void runProgram(const std::string& source, const std::string& dir = "") {
     Program program = parseProgram(source);
-    Interpreter interpreter;
-    if (!dir.empty()) interpreter.setCurrentDir(dir);
-    interpreter.interpret(program);
+    
+    Compiler compiler(nullptr, FunctionType::TYPE_SCRIPT);
+    auto function = compiler.compile(program);
+    if (function) {
+        VM vm;
+        InterpretResult result = vm.interpret(function, dir);
+        if (result != InterpretResult::INTERPRET_OK) {
+            exit(1);
+        }
+    } else {
+        std::cerr << "Compile Error\n";
+    }
 }
 
 static void checkProgram(const std::string& source) {
@@ -120,21 +131,15 @@ static void checkProgram(const std::string& source) {
 }
 
 static void startRepl() {
-    Interpreter interpreter;
+    VM vm;
     std::string line;
 
-    std::cout << "Vion REPL v0.4.0\n";
+    std::cout << "Vion REPL v0.5.0\n";
     std::cout << "Type 'exit' or press Ctrl+Z then Enter to quit.\n";
 
     while (true) {
-        std::cout << "vion> ";
-
-        if (!std::getline(std::cin, line)) {
-            std::cout << "\n";
-            break;
-        }
-
-        if (line == "exit" || line == "quit") {
+        std::cout << "> ";
+        if (!std::getline(std::cin, line) || line == "exit") {
             break;
         }
 
@@ -144,9 +149,13 @@ static void startRepl() {
 
         try {
             Program program = parseProgram(line);
-            interpreter.interpret(program);
-        } catch (const std::exception& error) {
-            std::cerr << "Error: " << error.what() << "\n";
+            Compiler compiler(nullptr, FunctionType::TYPE_SCRIPT);
+            auto function = compiler.compile(program);
+            if (function) {
+                vm.interpret(function);
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << "\n";
         }
     }
 }
@@ -207,8 +216,8 @@ int main(int argc, char* argv[]) {
 
         if (isVionFilePath(command)) {
             std::string source = readFile(command);
-            std::string dir = std::filesystem::path(command).parent_path().string();
-            runProgram(source, dir);
+            std::string absPath = std::filesystem::absolute(command).string();
+            runProgram(source, absPath);
             return 0;
         }
 
@@ -232,8 +241,8 @@ int main(int argc, char* argv[]) {
         }
 
         if (isOneOf(command, {"run", "--run", "-r"})) {
-            std::string dir = std::filesystem::path(filePath).parent_path().string();
-            runProgram(source, dir);
+            std::string absPath = std::filesystem::absolute(filePath).string();
+            runProgram(source, absPath);
             return 0;
         }
 

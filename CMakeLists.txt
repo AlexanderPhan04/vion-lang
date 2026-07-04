@@ -11,9 +11,10 @@ add_executable(vion
     src/main.cpp
     src/lexer/Lexer.cpp
     src/parser/Parser.cpp
-    src/runtime/Environment.cpp
     src/runtime/GC.cpp
-    src/interpreter/Interpreter.cpp
+    src/vm/Chunk.cpp
+    src/vm/VM.cpp
+    src/compiler/Compiler.cpp
 )
 
 target_include_directories(vion PRIVATE src)
