@@ -11,6 +11,7 @@ enum class OpCode : uint8_t {
 
     // Stack Operations
     OP_POP,
+    OP_DUP,          // Duplicate top of stack
 
     // Variables
     OP_GET_LOCAL,

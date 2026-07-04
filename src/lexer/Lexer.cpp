@@ -111,6 +111,16 @@ void Lexer::scanToken() {
         case '/':
             if (match('/')) {
                 while (peek() != '\n' && !isAtEnd()) advance();
+            } else if (match('*')) {
+                // Block comment /* ... */
+                while (!isAtEnd()) {
+                    if (peek() == '\n') { line++; column = 1; }
+                    if (peek() == '*' && peekNext() == '/') {
+                        advance(); advance(); // consume */
+                        break;
+                    }
+                    advance();
+                }
             } else if (match('=')) {
                 addToken(TokenType::SLASH_EQUAL);
             } else {

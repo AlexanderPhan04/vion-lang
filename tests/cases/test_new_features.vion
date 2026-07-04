@@ -1,0 +1,86 @@
+// Smoke test toàn bộ features mới của Vion
+
+/* Block comment — should be ignored */
+
+// ── Ternary ──────────────────────────────
+let x = 10
+let label = x > 5 ? "big" : "small"
+print label        // big
+
+// ── Match ────────────────────────────────
+let grade = match x {
+    10 -> "A",
+    9  -> "B",
+    _  -> "other"
+}
+print grade        // A
+
+// ── Compound assignment ───────────────────
+let n = 5
+n += 3
+n -= 1
+n *= 2
+print n            // 14
+
+// ── ++ / -- ──────────────────────────────
+n++
+print n            // 15
+
+// ── Default parameters ───────────────────
+fn greet(name, greeting = "Hello") {
+    return greeting + ", " + name + "!"
+}
+print greet("Vion")          // Hello, Vion!
+print greet("World", "Hi")   // Hi, World!
+
+// ── Lambda ───────────────────────────────
+let double = fn(v) { return v * 2 }
+print double(21)   // 42
+
+// ── range ────────────────────────────────
+let r = range(5)
+print len(r)       // 5
+let r2 = range(2, 7)
+print r2[0]        // 2
+print r2[4]        // 6
+
+// ── Math ──────────────────────────────────
+print round(3.7)   // 4
+print pow(2, 10)   // 1024
+print floor(sin(pi()) * 100) / 100   // sin(π) ≈ 0
+
+// ── String ────────────────────────────────
+let s = "  hello world  "
+print trim(s)             // hello world
+print starts_with("vion", "vi")    // true
+print ends_with("vion", "on")      // true
+print replace("foo bar foo", "foo", "baz")  // baz bar baz
+print index_of("hello", "ll")      // 2
+print substring("hello", 1, 3)     // ell
+
+// ── Array ────────────────────────────────
+let arr = [3, 1, 4, 1, 5, 9, 2, 6]
+sort(arr)
+print arr[0]   // 1
+print join(arr, "-")     // 1-1-2-3-4-5-6-9
+print sum(arr)           // 31
+let sl = slice(arr, 2, 5)
+print join(sl, ",")      // 2,3,4
+let u = unique([1,2,2,3,3,3])
+print len(u)   // 3
+print contains([1,2,3], 2)   // true
+print contains("hello", "ell")  // true
+
+// ── Map ───────────────────────────────────
+let m = {name: "Vion", version: 1}
+let k = keys(m)
+print has_key(m, "name")    // true
+print has_key(m, "age")     // false
+delete_key(m, "version")
+print len(keys(m))           // 1
+
+// ── OS ────────────────────────────────────
+print type(cwd())            // string
+print file_exists("build/Release/vion.exe")  // true
+
+print "all ok"

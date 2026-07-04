@@ -13,6 +13,9 @@
 #include <memory>
 #include <cstdio>
 #include <sstream>
+#include <functional>
+#include <algorithm>
+#include <cmath>
 
 #include "lexer/Lexer.h"
 #include "parser/Parser.h"
@@ -745,7 +748,344 @@ VM::VM() {
         // PG/MySQL: not directly available via CLI; return -1 as "unknown"
         return Value::number(-1);
     });
+
+    // ── Math ──────────────────────────────────────────────────────────────────
+    defineNative("sin",   [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::sin(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("cos",   [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::cos(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("tan",   [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::tan(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("asin",  [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::asin(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("acos",  [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::acos(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("atan",  [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::atan(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("atan2", [](int n, Value* a) { return n==2&&a[0].type==ValueType::NUMBER&&a[1].type==ValueType::NUMBER?Value::number(std::atan2(std::get<double>(a[0].data),std::get<double>(a[1].data))):Value::nil(); });
+    defineNative("log",   [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::log(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("log2",  [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::log2(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("log10", [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::log10(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("exp",   [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::exp(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("pow",   [](int n, Value* a) { return n==2&&a[0].type==ValueType::NUMBER&&a[1].type==ValueType::NUMBER?Value::number(std::pow(std::get<double>(a[0].data),std::get<double>(a[1].data))):Value::nil(); });
+    defineNative("round", [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::round(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("trunc", [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::trunc(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("floor", [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::floor(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("ceil",  [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::ceil(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("sqrt",  [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::sqrt(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("abs",   [](int n, Value* a) { return n==1&&a[0].type==ValueType::NUMBER?Value::number(std::abs(std::get<double>(a[0].data))):Value::nil(); });
+    defineNative("max",   [](int n, Value* a) { return n==2&&a[0].type==ValueType::NUMBER&&a[1].type==ValueType::NUMBER?Value::number(std::max(std::get<double>(a[0].data),std::get<double>(a[1].data))):Value::nil(); });
+    defineNative("min",   [](int n, Value* a) { return n==2&&a[0].type==ValueType::NUMBER&&a[1].type==ValueType::NUMBER?Value::number(std::min(std::get<double>(a[0].data),std::get<double>(a[1].data))):Value::nil(); });
+    defineNative("pi",    [](int, Value*) { return Value::number(3.14159265358979323846); });
+    defineNative("e_val", [](int, Value*) { return Value::number(2.71828182845904523536); });
+
+
+    // ── String ────────────────────────────────────────────────────────────────
+    defineNative("trim", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::STRING) return Value::nil();
+        std::string s = std::get<std::string>(a[0].data);
+        size_t l = s.find_first_not_of(" \t\n\r");
+        size_t r = s.find_last_not_of(" \t\n\r");
+        return Value::string(l==std::string::npos?"":s.substr(l,r-l+1));
+    });
+    defineNative("ltrim", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::STRING) return Value::nil();
+        std::string s = std::get<std::string>(a[0].data);
+        size_t l = s.find_first_not_of(" \t\n\r");
+        return Value::string(l==std::string::npos?"":s.substr(l));
+    });
+    defineNative("rtrim", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::STRING) return Value::nil();
+        std::string s = std::get<std::string>(a[0].data);
+        size_t r = s.find_last_not_of(" \t\n\r");
+        return Value::string(r==std::string::npos?"":s.substr(0,r+1));
+    });
+    defineNative("replace", [](int n, Value* a) -> Value {
+        if (n!=3||a[0].type!=ValueType::STRING||a[1].type!=ValueType::STRING||a[2].type!=ValueType::STRING) return Value::nil();
+        std::string s=std::get<std::string>(a[0].data), from=std::get<std::string>(a[1].data), to=std::get<std::string>(a[2].data);
+        if (from.empty()) return Value::string(s);
+        size_t pos=0;
+        while((pos=s.find(from,pos))!=std::string::npos){s.replace(pos,from.size(),to);pos+=to.size();}
+        return Value::string(s);
+    });
+    defineNative("starts_with", [](int n, Value* a) -> Value {
+        if (n!=2||a[0].type!=ValueType::STRING||a[1].type!=ValueType::STRING) return Value::boolean(false);
+        const std::string& s=std::get<std::string>(a[0].data),&p=std::get<std::string>(a[1].data);
+        return Value::boolean(s.size()>=p.size()&&s.substr(0,p.size())==p);
+    });
+    defineNative("ends_with", [](int n, Value* a) -> Value {
+        if (n!=2||a[0].type!=ValueType::STRING||a[1].type!=ValueType::STRING) return Value::boolean(false);
+        const std::string& s=std::get<std::string>(a[0].data),&p=std::get<std::string>(a[1].data);
+        return Value::boolean(s.size()>=p.size()&&s.substr(s.size()-p.size())==p);
+    });
+    defineNative("index_of", [](int n, Value* a) -> Value {
+        if (n<2) return Value::number(-1);
+        if (a[0].type==ValueType::STRING&&a[1].type==ValueType::STRING) {
+            size_t pos=std::get<std::string>(a[0].data).find(std::get<std::string>(a[1].data));
+            return Value::number(pos==std::string::npos?-1:(double)pos);
+        }
+        if (a[0].type==ValueType::ARRAY) {
+            auto& elems=std::get<std::shared_ptr<VionArray>>(a[0].data)->elements;
+            for (size_t i=0;i<elems.size();i++) if(elems[i]==a[1]) return Value::number((double)i);
+            return Value::number(-1);
+        }
+        return Value::number(-1);
+    });
+    defineNative("substring", [](int n, Value* a) -> Value {
+        if (n<2||a[0].type!=ValueType::STRING||a[1].type!=ValueType::NUMBER) return Value::nil();
+        const std::string& s=std::get<std::string>(a[0].data);
+        int start=(int)std::get<double>(a[1].data);
+        if(start<0)start=0;
+        if(start>=(int)s.size()) return Value::string("");
+        if(n>=3&&a[2].type==ValueType::NUMBER){
+            int len=(int)std::get<double>(a[2].data);
+            return Value::string(s.substr(start,len));
+        }
+        return Value::string(s.substr(start));
+    });
+    defineNative("char_at", [](int n, Value* a) -> Value {
+        if (n!=2||a[0].type!=ValueType::STRING||a[1].type!=ValueType::NUMBER) return Value::nil();
+        const std::string& s=std::get<std::string>(a[0].data);
+        int i=(int)std::get<double>(a[1].data);
+        if(i<0||i>=(int)s.size()) return Value::nil();
+        return Value::string(std::string(1,s[i]));
+    });
+    defineNative("char_code", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::STRING) return Value::nil();
+        const std::string& s=std::get<std::string>(a[0].data);
+        return s.empty()?Value::nil():Value::number((double)(unsigned char)s[0]);
+    });
+    defineNative("from_char_code", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::NUMBER) return Value::nil();
+        return Value::string(std::string(1,(char)(int)std::get<double>(a[0].data)));
+    });
+    defineNative("str_repeat", [](int n, Value* a) -> Value {
+        if (n!=2||a[0].type!=ValueType::STRING||a[1].type!=ValueType::NUMBER) return Value::nil();
+        std::string s=std::get<std::string>(a[0].data);
+        int times=(int)std::get<double>(a[1].data);
+        std::string result; result.reserve(s.size()*std::max(0,times));
+        for(int i=0;i<times;i++) result+=s;
+        return Value::string(result);
+    });
+    defineNative("split", [](int n, Value* a) -> Value {
+        if (n<1||a[0].type!=ValueType::STRING) return Value::array();
+        std::string s=std::get<std::string>(a[0].data);
+        std::string delim=(n>=2&&a[1].type==ValueType::STRING)?std::get<std::string>(a[1].data):"";
+        auto arr=std::make_shared<VionArray>();
+        if(delim.empty()){for(char c:s)arr->elements.push_back(Value::string(std::string(1,c)));return Value::array(arr);}
+        size_t pos=0,found;
+        while((found=s.find(delim,pos))!=std::string::npos){arr->elements.push_back(Value::string(s.substr(pos,found-pos)));pos=found+delim.size();}
+        arr->elements.push_back(Value::string(s.substr(pos)));
+        return Value::array(arr);
+    });
+    defineNative("count", [](int n, Value* a) -> Value {
+        if (n!=2) return Value::number(0);
+        if (a[0].type==ValueType::STRING&&a[1].type==ValueType::STRING) {
+            const std::string& s=std::get<std::string>(a[0].data),&sub=std::get<std::string>(a[1].data);
+            if(sub.empty()) return Value::number(0);
+            int cnt=0; size_t pos=0;
+            while((pos=s.find(sub,pos))!=std::string::npos){cnt++;pos+=sub.size();}
+            return Value::number(cnt);
+        }
+        return Value::number(0);
+    });
+
+    // ── Array ─────────────────────────────────────────────────────────────────
+    defineNative("pop", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::ARRAY) return Value::nil();
+        auto arr=std::get<std::shared_ptr<VionArray>>(a[0].data);
+        if(arr->elements.empty()) return Value::nil();
+        Value v=arr->elements.back(); arr->elements.pop_back(); return v;
+    });
+    defineNative("sort", [](int n, Value* a) -> Value {
+        if (n<1||a[0].type!=ValueType::ARRAY) return Value::nil();
+        auto arr=std::get<std::shared_ptr<VionArray>>(a[0].data);
+        if (n>=2&&a[1].type==ValueType::BYTECODE_FUNCTION) {
+            // sort with comparator — skip for now, do default
+        }
+        std::stable_sort(arr->elements.begin(),arr->elements.end(),[](const Value& x,const Value& y){
+            if(x.type==ValueType::NUMBER&&y.type==ValueType::NUMBER)
+                return std::get<double>(x.data)<std::get<double>(y.data);
+            return x.toString()<y.toString();
+        });
+        return a[0];
+    });
+    defineNative("reverse", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::ARRAY) return Value::nil();
+        auto arr=std::get<std::shared_ptr<VionArray>>(a[0].data);
+        std::reverse(arr->elements.begin(),arr->elements.end());
+        return a[0];
+    });
+    defineNative("join", [](int n, Value* a) -> Value {
+        if (n<1||a[0].type!=ValueType::ARRAY) return Value::nil();
+        std::string sep=(n>=2&&a[1].type==ValueType::STRING)?std::get<std::string>(a[1].data):",";
+        auto& elems=std::get<std::shared_ptr<VionArray>>(a[0].data)->elements;
+        std::string result;
+        for(size_t i=0;i<elems.size();i++){if(i>0)result+=sep;result+=elems[i].toString();}
+        return Value::string(result);
+    });
+    defineNative("slice", [](int n, Value* a) -> Value {
+        if (n<2||a[0].type!=ValueType::ARRAY||a[1].type!=ValueType::NUMBER) return Value::array();
+        auto& elems=std::get<std::shared_ptr<VionArray>>(a[0].data)->elements;
+        int start=(int)std::get<double>(a[1].data);
+        int end=(n>=3&&a[2].type==ValueType::NUMBER)?(int)std::get<double>(a[2].data):(int)elems.size();
+        if(start<0)start=(int)elems.size()+start;
+        if(end<0)end=(int)elems.size()+end;
+        start=std::max(0,std::min(start,(int)elems.size()));
+        end=std::max(start,std::min(end,(int)elems.size()));
+        auto result=std::make_shared<VionArray>();
+        result->elements=std::vector<Value>(elems.begin()+start,elems.begin()+end);
+        return Value::array(result);
+    });
+    defineNative("contains", [](int n, Value* a) -> Value {
+        if (n!=2) return Value::boolean(false);
+        if(a[0].type==ValueType::ARRAY){
+            auto& elems=std::get<std::shared_ptr<VionArray>>(a[0].data)->elements;
+            for(auto& e:elems) if(e==a[1]) return Value::boolean(true);
+            return Value::boolean(false);
+        }
+        if(a[0].type==ValueType::STRING&&a[1].type==ValueType::STRING)
+            return Value::boolean(std::get<std::string>(a[0].data).find(std::get<std::string>(a[1].data))!=std::string::npos);
+        return Value::boolean(false);
+    });
+    defineNative("unique", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::ARRAY) return Value::array();
+        auto& elems=std::get<std::shared_ptr<VionArray>>(a[0].data)->elements;
+        auto result=std::make_shared<VionArray>();
+        for(auto& e:elems){
+            bool found=false;
+            for(auto& r:result->elements) if(r==e){found=true;break;}
+            if(!found) result->elements.push_back(e);
+        }
+        return Value::array(result);
+    });
+    defineNative("flatten", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::ARRAY) return Value::array();
+        auto result=std::make_shared<VionArray>();
+        std::function<void(const Value&)> flat=[&](const Value& v){
+            if(v.type==ValueType::ARRAY){
+                for(auto& e:std::get<std::shared_ptr<VionArray>>(v.data)->elements) flat(e);
+            } else result->elements.push_back(v);
+        };
+        for(auto& e:std::get<std::shared_ptr<VionArray>>(a[0].data)->elements) flat(e);
+        return Value::array(result);
+    });
+    defineNative("sum", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::ARRAY) return Value::number(0);
+        double s=0;
+        for(auto& e:std::get<std::shared_ptr<VionArray>>(a[0].data)->elements)
+            if(e.type==ValueType::NUMBER) s+=std::get<double>(e.data);
+        return Value::number(s);
+    });
+    defineNative("avg", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::ARRAY) return Value::nil();
+        auto& elems=std::get<std::shared_ptr<VionArray>>(a[0].data)->elements;
+        if(elems.empty()) return Value::nil();
+        double s=0; int cnt=0;
+        for(auto& e:elems) if(e.type==ValueType::NUMBER){s+=std::get<double>(e.data);cnt++;}
+        return cnt>0?Value::number(s/cnt):Value::nil();
+    });
+    defineNative("insert", [](int n, Value* a) -> Value {
+        if (n!=3||a[0].type!=ValueType::ARRAY||a[1].type!=ValueType::NUMBER) return Value::nil();
+        auto arr=std::get<std::shared_ptr<VionArray>>(a[0].data);
+        int idx=(int)std::get<double>(a[1].data);
+        if(idx<0)idx=0; if(idx>(int)arr->elements.size())idx=(int)arr->elements.size();
+        arr->elements.insert(arr->elements.begin()+idx,a[2]);
+        return a[0];
+    });
+    defineNative("remove", [](int n, Value* a) -> Value {
+        if (n!=2||a[0].type!=ValueType::ARRAY||a[1].type!=ValueType::NUMBER) return Value::nil();
+        auto arr=std::get<std::shared_ptr<VionArray>>(a[0].data);
+        int idx=(int)std::get<double>(a[1].data);
+        if(idx<0||idx>=(int)arr->elements.size()) return Value::nil();
+        Value removed=arr->elements[idx];
+        arr->elements.erase(arr->elements.begin()+idx);
+        return removed;
+    });
+
+    // ── Map ───────────────────────────────────────────────────────────────────
+    defineNative("keys", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::MAP) return Value::array();
+        auto& entries=std::get<std::shared_ptr<VionMap>>(a[0].data)->entries;
+        auto arr=std::make_shared<VionArray>();
+        for(auto& [k,v]:entries) arr->elements.push_back(Value::string(k));
+        return Value::array(arr);
+    });
+    defineNative("values", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::MAP) return Value::array();
+        auto& entries=std::get<std::shared_ptr<VionMap>>(a[0].data)->entries;
+        auto arr=std::make_shared<VionArray>();
+        for(auto& [k,v]:entries) arr->elements.push_back(v);
+        return Value::array(arr);
+    });
+    defineNative("has_key", [](int n, Value* a) -> Value {
+        if (n!=2||a[0].type!=ValueType::MAP||a[1].type!=ValueType::STRING) return Value::boolean(false);
+        auto& entries=std::get<std::shared_ptr<VionMap>>(a[0].data)->entries;
+        return Value::boolean(entries.find(std::get<std::string>(a[1].data))!=entries.end());
+    });
+    defineNative("delete_key", [](int n, Value* a) -> Value {
+        if (n!=2||a[0].type!=ValueType::MAP||a[1].type!=ValueType::STRING) return Value::boolean(false);
+        auto& entries=std::get<std::shared_ptr<VionMap>>(a[0].data)->entries;
+        return Value::boolean(entries.erase(std::get<std::string>(a[1].data))>0);
+    });
+    defineNative("entries", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::MAP) return Value::array();
+        auto& ents=std::get<std::shared_ptr<VionMap>>(a[0].data)->entries;
+        auto arr=std::make_shared<VionArray>();
+        for(auto& [k,v]:ents){
+            auto pair=std::make_shared<VionArray>();
+            pair->elements.push_back(Value::string(k));
+            pair->elements.push_back(v);
+            arr->elements.push_back(Value::array(pair));
+        }
+        return Value::array(arr);
+    });
+    defineNative("map_merge", [](int n, Value* a) -> Value {
+        if (n!=2||a[0].type!=ValueType::MAP||a[1].type!=ValueType::MAP) return Value::nil();
+        auto result=std::make_shared<VionMap>();
+        result->entries=std::get<std::shared_ptr<VionMap>>(a[0].data)->entries;
+        for(auto& [k,v]:std::get<std::shared_ptr<VionMap>>(a[1].data)->entries) result->entries[k]=v;
+        return Value::map(result);
+    });
+
+    // ── OS / System ───────────────────────────────────────────────────────────
+    defineNative("env", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::STRING) return Value::nil();
+        const char* val=std::getenv(std::get<std::string>(a[0].data).c_str());
+        return val?Value::string(val):Value::nil();
+    });
+    defineNative("exit", [](int n, Value* a) -> Value {
+        int code=(n>=1&&a[0].type==ValueType::NUMBER)?(int)std::get<double>(a[0].data):0;
+        std::exit(code); return Value::nil();
+    });
+    defineNative("cwd", [](int, Value*) -> Value {
+        try { return Value::string(std::filesystem::current_path().string()); }
+        catch(...) { return Value::nil(); }
+    });
+    defineNative("file_append", [](int n, Value* a) -> Value {
+        if (n!=2||a[0].type!=ValueType::STRING||a[1].type!=ValueType::STRING) return Value::boolean(false);
+        std::ofstream f(std::get<std::string>(a[0].data),std::ios::app);
+        if(!f.is_open()) return Value::boolean(false);
+        f<<std::get<std::string>(a[1].data);
+        return Value::boolean(true);
+    });
+    defineNative("file_exists", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::STRING) return Value::boolean(false);
+        return Value::boolean(std::filesystem::exists(std::get<std::string>(a[0].data)));
+    });
+    defineNative("file_delete", [](int n, Value* a) -> Value {
+        if (n!=1||a[0].type!=ValueType::STRING) return Value::boolean(false);
+        try { return Value::boolean(std::filesystem::remove(std::get<std::string>(a[0].data))); }
+        catch(...) { return Value::boolean(false); }
+    });
+
+    // ── range(n) / range(a,b) / range(a,b,step) ───────────────────────────────
+    defineNative("range", [](int n, Value* a) -> Value {
+        if (n<1||a[0].type!=ValueType::NUMBER) return Value::array();
+        double start=0,end=std::get<double>(a[0].data),step=1;
+        if(n>=2&&a[1].type==ValueType::NUMBER){start=end;end=std::get<double>(a[1].data);}
+        if(n>=3&&a[2].type==ValueType::NUMBER) step=std::get<double>(a[2].data);
+        if(step==0||step>0&&start>=end||step<0&&start<=end) return Value::array();
+        auto arr=std::make_shared<VionArray>();
+        for(double v=start;step>0?v<end:v>end;v+=step) arr->elements.push_back(Value::number(v));
+        return Value::array(arr);
+    });
 }
+
 
 VM::~VM() {}
 
@@ -921,6 +1261,10 @@ InterpretResult VM::run() {
                 pop();
                 break;
             }
+            case static_cast<uint8_t>(OpCode::OP_DUP): {
+                push(stack.back());
+                break;
+            }
             case static_cast<uint8_t>(OpCode::OP_DEFINE_GLOBAL): {
                 Value name = readConstant();
                 globals[name.toString()] = pop();
@@ -999,14 +1343,24 @@ InterpretResult VM::run() {
                 Value callee = stack[stack.size() - 1 - argCount];
                 if (callee.type == ValueType::BYTECODE_FUNCTION) {
                     auto function = std::get<std::shared_ptr<BytecodeFunction>>(callee.data);
-                    if (argCount != function->arity) {
-                        std::cerr << "Runtime Error: Expected " << function->arity << " arguments but got " << argCount << ".\n";
-                        return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                    int required = function->requiredArity > 0 ? function->requiredArity : function->arity;
+                    if (argCount < required || argCount > function->arity) {
+                        std::string msg = "Expected ";
+                        if (required == function->arity) {
+                            msg += std::to_string(function->arity);
+                        } else {
+                            msg += std::to_string(required) + "-" + std::to_string(function->arity);
+                        }
+                        msg += " arguments but got " + std::to_string(argCount) + ".";
+                        if (!handleError(msg)) return InterpretResult::INTERPRET_RUNTIME_ERROR;
+                        break;
                     }
+                    // Pad missing optional args with nil
+                    for (int i = argCount; i < function->arity; i++) push(Value::nil());
                     CallFrame frame;
                     frame.function = function;
                     frame.ip = function->chunk->code.data();
-                    frame.slots_base = stack.size() - argCount - 1;
+                    frame.slots_base = stack.size() - function->arity - 1;
                     frames.push_back(frame);
                 } else if (callee.type == ValueType::NATIVE_FUNCTION) {
                     auto native = std::get<std::shared_ptr<VMNativeFunction>>(callee.data);

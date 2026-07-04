@@ -17,6 +17,7 @@ enum class InterpretResult {
 
 struct BytecodeFunction : public GCObject {
     int arity = 0;
+    int requiredArity = 0;  // params without defaults
     std::shared_ptr<Chunk> chunk;
     std::string name;
     
@@ -60,6 +61,7 @@ private:
     std::string currentScriptPath;
     
     std::unordered_map<std::string, Value> globals;
+    std::vector<std::string> scriptArgs;  // CLI args passed to script
 
     uint8_t readByte();
     uint16_t readShort();

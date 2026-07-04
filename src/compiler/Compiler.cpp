@@ -111,11 +111,23 @@ void Compiler::compileStatement(const Stmt& stmt) {
         } else {
             emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
         }
-        
         if (scopeDepth > 0) {
             addLocal(letStmt->name);
         } else {
             int index = currentChunk()->addConstant(Value::string(letStmt->name));
+            emitBytes(static_cast<uint8_t>(OpCode::OP_DEFINE_GLOBAL), static_cast<uint8_t>(index));
+        }
+    } else if (const auto* constStmt = dynamic_cast<const ConstStmt*>(&stmt)) {
+        // ConstStmt compiled identically to LetStmt for now (immutability is advisory)
+        if (constStmt->value) {
+            compileExpression(*constStmt->value);
+        } else {
+            emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
+        }
+        if (scopeDepth > 0) {
+            addLocal(constStmt->name);
+        } else {
+            int index = currentChunk()->addConstant(Value::string(constStmt->name));
             emitBytes(static_cast<uint8_t>(OpCode::OP_DEFINE_GLOBAL), static_cast<uint8_t>(index));
         }
     } else if (const auto* blockStmt = dynamic_cast<const BlockStmt*>(&stmt)) {
@@ -245,11 +257,39 @@ void Compiler::compileStatement(const Stmt& stmt) {
         childCompiler.function->name = funcStmt->name;
         childCompiler.function->arity = funcStmt->parameters.size();
         
+        // Count required (non-default) parameters
+        int requiredArity = 0;
+        for (const auto& p : funcStmt->parameters) {
+            if (!p.second) requiredArity++;
+        }
+        childCompiler.function->requiredArity = requiredArity;
+        
         childCompiler.beginScope();
         for (const auto& param : funcStmt->parameters) {
             childCompiler.addLocal(param.first);
         }
         
+        // Emit default parameter fill-in at start of function body:
+        // if param slot == nil → assign default value
+        for (int pi = 0; pi < static_cast<int>(funcStmt->parameters.size()); pi++) {
+            const auto& param = funcStmt->parameters[pi];
+            if (param.second) {
+                // GET_LOCAL (pi+1) → peek value
+                childCompiler.emitBytes(static_cast<uint8_t>(OpCode::OP_GET_LOCAL), static_cast<uint8_t>(pi + 1));
+                // If NOT nil, jump past the default assignment
+                int skipDefault = childCompiler.emitJump(static_cast<uint8_t>(OpCode::OP_JUMP_IF_FALSE));
+                // Non-nil branch: discard peeked value and jump over default code
+                childCompiler.emitByte(static_cast<uint8_t>(OpCode::OP_POP));
+                int doneJump = childCompiler.emitJump(static_cast<uint8_t>(OpCode::OP_JUMP));
+                // Nil branch: pop nil, compute default, assign
+                childCompiler.patchJump(skipDefault);
+                childCompiler.emitByte(static_cast<uint8_t>(OpCode::OP_POP)); // pop nil
+                childCompiler.compileExpression(*param.second);
+                childCompiler.emitBytes(static_cast<uint8_t>(OpCode::OP_SET_LOCAL), static_cast<uint8_t>(pi + 1));
+                childCompiler.emitByte(static_cast<uint8_t>(OpCode::OP_POP)); // pop SET result
+                childCompiler.patchJump(doneJump);
+            }
+        }
         for (const auto& s : funcStmt->body->statements) {
             childCompiler.compileStatement(*s);
         }
@@ -429,5 +469,76 @@ void Compiler::compileExpression(const Expr& expr) {
         } else {
             emitConstant(Value::string(""));
         }
+    } else if (const auto* ternExpr = dynamic_cast<const TernaryExpr*>(&expr)) {
+        // condition ? thenExpr : elseExpr
+        compileExpression(*ternExpr->condition);
+        int falseJump = emitJump(static_cast<uint8_t>(OpCode::OP_JUMP_IF_FALSE));
+        emitByte(static_cast<uint8_t>(OpCode::OP_POP));
+        compileExpression(*ternExpr->thenExpr);
+        int endJump = emitJump(static_cast<uint8_t>(OpCode::OP_JUMP));
+        patchJump(falseJump);
+        emitByte(static_cast<uint8_t>(OpCode::OP_POP));
+        compileExpression(*ternExpr->elseExpr);
+        patchJump(endJump);
+    } else if (const auto* matchExpr = dynamic_cast<const MatchExpr*>(&expr)) {
+        // match subject { pattern -> expr, ... _ -> expr }
+        // Strategy: compile subject, then for each case emit: DUP, push pattern, EQUAL, jump_if_false
+        compileExpression(*matchExpr->subject);
+        std::vector<int> endJumps;
+        for (size_t i = 0; i < matchExpr->cases.size(); i++) {
+            const auto& mc = matchExpr->cases[i];
+            if (!mc.pattern) {
+                // Wildcard _ — always matches: pop subject, emit body
+                emitByte(static_cast<uint8_t>(OpCode::OP_POP));
+                compileExpression(*mc.body);
+                break; // wildcard must be last
+            }
+            // Duplicate subject on stack for comparison
+            emitByte(static_cast<uint8_t>(OpCode::OP_DUP));
+            compileExpression(*mc.pattern);
+            emitByte(static_cast<uint8_t>(OpCode::OP_EQUAL));
+            int falseJump = emitJump(static_cast<uint8_t>(OpCode::OP_JUMP_IF_FALSE));
+            emitByte(static_cast<uint8_t>(OpCode::OP_POP)); // pop condition
+            emitByte(static_cast<uint8_t>(OpCode::OP_POP)); // pop subject copy
+            compileExpression(*mc.body);
+            endJumps.push_back(emitJump(static_cast<uint8_t>(OpCode::OP_JUMP)));
+            patchJump(falseJump);
+            emitByte(static_cast<uint8_t>(OpCode::OP_POP)); // pop condition
+        }
+        // If no case matched, leave subject on stack (emit nil as default)
+        emitByte(static_cast<uint8_t>(OpCode::OP_POP)); // pop remaining subject
+        emitByte(static_cast<uint8_t>(OpCode::OP_NIL));
+        for (int j : endJumps) patchJump(j);
+    } else if (const auto* lambdaExpr = dynamic_cast<const LambdaExpr*>(&expr)) {
+        // fn(...) { body } as an expression
+        const FunctionStmt* funcStmt = lambdaExpr->decl.get();
+        Compiler childCompiler(this, FunctionType::TYPE_FUNCTION);
+        childCompiler.function->name = funcStmt->name;
+        childCompiler.function->arity = funcStmt->parameters.size();
+        int requiredArity = 0;
+        for (const auto& p : funcStmt->parameters) { if (!p.second) requiredArity++; }
+        childCompiler.function->requiredArity = requiredArity;
+        childCompiler.beginScope();
+        for (const auto& param : funcStmt->parameters) childCompiler.addLocal(param.first);
+        // Default params
+        for (int pi = 0; pi < static_cast<int>(funcStmt->parameters.size()); pi++) {
+            const auto& param = funcStmt->parameters[pi];
+            if (param.second) {
+                childCompiler.emitBytes(static_cast<uint8_t>(OpCode::OP_GET_LOCAL), static_cast<uint8_t>(pi + 1));
+                int skipJump = childCompiler.emitJump(static_cast<uint8_t>(OpCode::OP_JUMP_IF_FALSE));
+                int endJump  = childCompiler.emitJump(static_cast<uint8_t>(OpCode::OP_JUMP));
+                childCompiler.patchJump(skipJump);
+                childCompiler.emitByte(static_cast<uint8_t>(OpCode::OP_POP));
+                childCompiler.compileExpression(*param.second);
+                childCompiler.emitBytes(static_cast<uint8_t>(OpCode::OP_SET_LOCAL), static_cast<uint8_t>(pi + 1));
+                childCompiler.emitByte(static_cast<uint8_t>(OpCode::OP_POP));
+                childCompiler.patchJump(endJump);
+                childCompiler.emitByte(static_cast<uint8_t>(OpCode::OP_POP));
+            }
+        }
+        for (const auto& s : funcStmt->body->statements) childCompiler.compileStatement(*s);
+        auto compiledFunc = childCompiler.endCompiler();
+        int funcIndex = currentChunk()->addConstant(Value::bytecodeFunction(compiledFunc));
+        emitBytes(static_cast<uint8_t>(OpCode::OP_CLOSURE), static_cast<uint8_t>(funcIndex));
     }
 }
