@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/AlexanderPhan04/vion-lang/main/assets/vion-logo.png" alt="Vion Language Logo" width="200" />
+  <img src="https://raw.githubusercontent.com/AlexanderPhan04/vion-lang/main/assets/vion-file-icon.svg" alt="Vion Language Logo" width="150" />
   <h1>Vion Programming Language</h1>
   <p><strong>Modern. Simple. Fast.</strong></p>
 
